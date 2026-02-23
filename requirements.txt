@@ -1,0 +1,6 @@
+django
+google-genai
+pdfplumber
+pypdf2
+pydantic
+python-dotenv

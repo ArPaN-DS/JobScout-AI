@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}Master Profile | AI Career Agent{% endblock %}
+{% block page_title %}Master Profile Setup{% endblock %}
+
+{% block content %}
+<div class="card premium-card">
+    <div class="card-header">
+        <h2>Your Professional Avatar</h2>
+        <p>Upload your resume to let our AI build your Master Profile. This profile will be dynamically adjusted to
+            perfectly match targeted job descriptions later.</p>
+    </div>
+
+    <form id="profile-form" class="modern-form" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="form-grid">
+            <div class="form-group upload-group">
+                <label for="resume-upload">Resume (PDF)</label>
+                <div class="upload-area" id="drop-zone">
+                    <input type="file" id="resume-upload" name="resume" accept="application/pdf" class="file-input"
+                        required>
+                    <div class="upload-content">
+                        <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                            </path>
+                        </svg>
+                        <span class="upload-text">Click to upload or drag & drop</span>
+                        <span class="file-name" id="file-name-display">No file chosen</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group links-group">
+                <div class="input-field">
+                    <label for="linkedin_url">LinkedIn Profile URL</label>
+                    <input type="url" id="linkedin_url" name="linkedin_url"
+                        placeholder="https://linkedin.com/in/username">
+                </div>
+
+                <div class="input-field mt-4">
+                    <label for="github_url">GitHub Profile URL (Optional)</label>
+                    <input type="url" id="github_url" name="github_url" placeholder="https://github.com/username">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions mt-6">
+            <button type="submit" class="btn btn-primary btn-glow" id="extract-btn">
+                <span class="btn-text">Generate AI Profile</span>
+                <span class="spinner hidden"></span>
+            </button>
+        </div>
+    </form>
+
+    <div id="error-banner" class="mt-4 hidden"
+        style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 4px; color: #ef4444; word-wrap: break-word;">
+        <strong>Error:</strong> <span id="error-text"></span>
+    </div>
+</div>
+
+<!-- Results Area -->
+<div id="results-area" class="mt-8 hidden">
+    <div class="card results-card">
+        <h3>Extracted Master Profile</h3>
+        <pre id="json-viewer" class="json-viewer"></pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const fileInput = document.getElementById('resume-upload');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const form = document.getElementById('profile-form');
+        const extractBtn = document.getElementById('extract-btn');
+        const btnText = extractBtn.querySelector('.btn-text');
+        const spinner = extractBtn.querySelector('.spinner');
+        const resultsArea = document.getElementById('results-area');
+        const jsonViewer = document.getElementById('json-viewer');
+
+        // Update file name display
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                fileNameDisplay.textContent = e.target.files[0].name;
+                fileNameDisplay.classList.add('has-file');
+            } else {
+                fileNameDisplay.textContent = 'No file chosen';
+                fileNameDisplay.classList.remove('has-file');
+            }
+        });
+
+        // Form Submission via AJAX
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // UI Loading state
+            btnText.textContent = "Extracting with Gemini...";
+            extractBtn.disabled = true;
+            spinner.classList.remove('hidden');
+            resultsArea.classList.add('hidden');
+
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch('{% url "profile_setup" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Show success
+                    document.getElementById('error-banner').classList.add('hidden');
+                    resultsArea.classList.remove('hidden');
+                    jsonViewer.textContent = JSON.stringify(data.data, null, 2);
+                } else {
+                    document.getElementById('error-banner').classList.remove('hidden');
+                    document.getElementById('error-text').textContent = data.error || ('Server error: ' + response.status);
+                    resultsArea.classList.add('hidden');
+                }
+
+            } catch (error) {
+                document.getElementById('error-banner').classList.remove('hidden');
+                document.getElementById('error-text').textContent = 'Network Error / Disconnected: ' + error.message;
+                resultsArea.classList.add('hidden');
+                console.error(error);
+            } finally {
+                // Restore UI
+                btnText.textContent = "Generate AI Profile";
+                extractBtn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        });
+    });
+</script>
+{% endblock %}

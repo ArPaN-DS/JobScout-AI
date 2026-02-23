@@ -1,0 +1,53 @@
+# Phase 2: Automated Career Agent Architecture & Cost Estimation
+
+## 1. What We Have Built So Far (Version 1)
+- **Master Profile Extraction:** Securely uploads PDF resumes and extracts structured JSON profiles automatically using Gemini 1.5 Flash.
+- **Job Match Engine:** Compares a given job description against the master profile and calculates an objective match score, matching skills, and missing skills.
+- **Application Kit Generation:** Uses the advanced **Gemini 1.5 Pro** model to rewrite experience points targeted specifically at the job description. Drafts a fully personalized cover letter.
+- **Database Tracking:** Manually saves applied jobs to a local SQLite database table.
+- **"Glassdoor" Error Handling:** All UI operations expose raw backend exceptions dynamically, preventing silent network or API failures.
+
+## 2. What We Want to Build Next (Version 2)
+### The Automated Job Discovery Engine
+
+The current limitation is that the user must manually copy and paste job descriptions. Version 2 will automate this via a web-scraping and aggregation pipeline.
+
+**Core Features of Version 2:**
+1. **Scraping Engine:** A Python background worker (using BeautifulSoup / Selenium / or a Job API) that continuously queries platforms (LinkedIn, Indeed, Startup boards) for roles like "NLP Engineer" or "Generative AI Developer".
+2. **Auto-Filtering:** As jobs stream in, they are immediately passed through the Match Engine. If the score is `< 60%`, the job is silently discarded.
+3. **Daily Digest UI:** The dashboard will display a queue of highly relevant automatically discovered jobs. 
+4. **1-Click Kit Prep:** From the queue, the user can click one button to generate Kits for all matched jobs before deciding which ones to formally submit.
+
+## 3. How We Need to Build This (Architecture)
+- **Backend Worker:** We will integrate `Celery` or Django Q as a robust asynchronous task queue locally, backed by `Redis` or SQLite.
+- **Scraping Agents:** We will build small modular scripts (`scrapers/linkedin.py`, `scrapers/ycombinator.py`) that run on a cron schedule within the celery worker.
+- **Data Persistence:** Extend the [Application](file:///d:/Job_finder_AI/core/models.py#4-21) Django model to track the "Status" of a job (e.g., `Scraped`, `Low Match`, `Matched`, `Generated`, `Submitted`).
+- **Dashboard UI:** Add a new tab `Auto-Queue` that queries the database heavily relying on AJAX for asynchronous updates.
+
+## 4. Operational Cost Estimation for 100 Job Applications
+
+The system is highly cost-effective because it utilizes Google Gemini's generous pricing tiers.
+
+**Assumptions per Job:**
+- Master Profile: `2,000` tokens
+- Job Description: `1,000` tokens
+- Match Engine Prompt: `3,000` input tokens, `500` output tokens (using Gemini **Flash** model).
+- App Kit Generation: `3,000` input tokens, `1,000` output tokens (using Gemini **Pro** model for higher reasoning).
+
+**Cost Breakdown for Gemini API:**
+> Note: Gemini 1.5 pricing as of late-2024.
+
+1. **Gemini 1.5 Flash (Match Engine):**
+   - $0.075 per 1 million input tokens.
+   - $0.30 per 1 million output tokens.
+   - **Cost for 100 Jobs:** $0.02 (Input) + $0.015 (Output) = **$0.035**
+
+2. **Gemini 1.5 Pro (Application Kit Builder):**
+   - $1.25 per 1 million input tokens.
+   - $5.00 per 1 million output tokens.
+   - **Cost for 100 Jobs:** $0.375 (Input) + $0.50 (Output) = **$0.875**
+
+**Total API Cost:**
+The total cost to automatically match, write a highly tailored ATS-friendly resume, and draft a cover letter for **100 highly complex job applications** is approximately **$0.91 (under 1 USD)**.
+
+*(Note: Data scraping tools or proxy servers for LinkedIn might introduce minor secondary costs if we rely on third-party APIs instead of raw local scraping).*
