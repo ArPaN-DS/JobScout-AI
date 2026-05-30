@@ -1,30 +1,94 @@
-# Python/Django
+# ─────────────────────────────────────────────────────────────────
+# Job_bro_AI — .gitignore
+# ─────────────────────────────────────────────────────────────────
+
+# ── Python ───────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+MANIFEST
 
-# Environments
+# ── Virtual Environments ──────────────────────────────────────────
+# The project uses job_finder_env/ as the venv folder
+job_finder_env/
 env/
 venv/
+.venv/
 ENV/
 env.bak/
 venv.bak/
-job_finder/
 
-# Django stuff:
+# ── Django ────────────────────────────────────────────────────────
 *.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# Environment variables
+# ── Secrets / Credentials ─────────────────────────────────────────
+# NEVER commit these
 .env
-.venv
+.env.local
+.env.production
+.env.*.local
+secrets.json
+credentials.json
 
-# Specific project files
+# ── Private candidate data ────────────────────────────────────────
+# Resume/CV files and extracted profile data are personal PII
 master_profile.json
 *.pdf
+*.docx
+tmp_uploads/
+media/
 
-# IDEs
+# ── IDE / Editor ──────────────────────────────────────────────────
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V8
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Testing ───────────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+junit.xml
+
+# ── Node (if any tooling is added) ───────────────────────────────
+node_modules/
+.npm/
+.yarn/
+
+# ── Playwright / Browser automation ──────────────────────────────
+playwright-report/
+test-results/
+
+# ── Misc ─────────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.orig
+*.resolved
