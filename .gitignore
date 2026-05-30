@@ -1,53 +1,459 @@
-# ─────────────────────────────────────────────────────────────────
-# Job_bro_AI — .gitignore
-# ─────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+# Job_bro_AI .gitignore
+# Comprehensive ignore patterns for Python Django project with PII protection
+# ═══════════════════════════════════════════════════════════════════════════
 
-# ── Python ───────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# PYTHON & VIRTUALENV
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Python compiled files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-*.pyd
-*.egg
-*.egg-info/
-dist/
+
+# C extensions
+*.c
+*.so
+
+# Distribution / packaging
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
 .eggs/
-*.whl
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 MANIFEST
 
-# ── Virtual Environments ──────────────────────────────────────────
-# The project uses job_finder_env/ as the venv folder
-job_finder_env/
-env/
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# pytype static type analyzer
+.pytype/
+.pytype-link
+
+# Cython debug symbols
+cython_debug/
+
+# Virtual environments (multiple patterns for compatibility)
 venv/
-.venv/
 ENV/
+env/
+.venv
+.env.local
+job_finder/            # Main project venv
+job_finder_env/        # Alternative venv location
 env.bak/
 venv.bak/
 
-# ── Django ────────────────────────────────────────────────────────
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DJANGO
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Django
 *.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
-# ── Secrets / Credentials ─────────────────────────────────────────
-# NEVER commit these
+# Migrations (but DO commit clean migrations)
+# Note: Clean migrations should be committed
+# /*/migrations/0*.py  # Uncomment if you want to ignore numbered migrations
+
+# Django static files (collected)
+/staticfiles/
+/static/collected/
+
+# Django media files (user uploads - PII!)
+/media/
+/tmp_uploads/
+
+# Django cache
+*.cache
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECRETS & CREDENTIALS (CRITICAL - NEVER COMMIT THESE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Environment files - NEVER COMMIT
 .env
+.env.*
+!.env.example
 .env.local
 .env.production
 .env.*.local
-secrets.json
-credentials.json
+.env.*.example
 
-# ── Private candidate data ────────────────────────────────────────
-# Resume/CV files and extracted profile data are personal PII
-master_profile.json
+# API Keys and credentials
+.api_keys
+api_keys.json
+credentials.json
+secrets.json
+credentials/
+auth/
+
+# OAuth tokens
+*.token
+tokens.db
+token.txt
+
+# SSH keys
+*.pem
+*.pub
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+~/.ssh/
+
+# AWS credentials
+.aws/
+~/.aws/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PERSONALLY IDENTIFIABLE INFORMATION (PII) - CRITICAL
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Resume files (CRITICAL - Contains personal information)
 *.pdf
 *.docx
+*.doc
+*.odt
+*.rtf
+*.pages
+
+# Resume data extracts
+master_profile.json
+profile_data.json
+extracted_profiles.json
+*_profile.json
+
+# Candidate screenshots (may contain PII)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+screenshots/
+captures/
+
+# Profile data directories
 tmp_uploads/
-media/
+user_data/
+candidates/
+profiles/
+personal_data/
+
+# Spreadsheets with candidate data
+*.xlsx
+*.xls
+*.csv        # May contain personal info (handle carefully)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDE & EDITOR
+# ─────────────────────────────────────────────────────────────────────────────
+
+# VS Code
+.vscode/
+*.code-workspace
+.history/
+.history
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+[._]sw[a-p]
+*~
+.swp
+.swo
+*.swn
+
+# Emacs
+*~
+\#*\#
+.\#*
+*.elc
+auto-save-list/
+
+# Nano
+.nano_history
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATING SYSTEM
+# ─────────────────────────────────────────────────────────────────────────────
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+.directory
+.Trash-*/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PACKAGE MANAGERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# npm
+node_modules/
+npm-debug.log
+yarn-error.log
+.npm
+.yarn
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Poetry
+poetry.lock
+
+# pipenv
+Pipfile.lock
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE
+# ─────────────────────────────────────────────────────────────────────────────
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+
+# PostgreSQL
+.psycopg2_version
+
+# MySQL
+*.mysql_db
+
+# Redis
+*.rdb
+dump.rdb
+
+# MongoDB
+*.mongodb
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUILD & DISTRIBUTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Compiled files
+*.pyc
+*.pyo
+*.so
+*.o
+*.a
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+
+# Wheel
+*.whl
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING & TEMPORARY FILES
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Log files
+*.log
+logs/
+*.out
+*.err
+*.tmp
+
+# Temporary files
+tmp/
+temp/
+*.temp
+*.tmp
+*.bak
+*.swp
+*~
+.~*
+
+# Test temporary files
+.pytest_cache/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# Pyre type checker
+.pyre/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROJECT SPECIFIC
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Local testing/development files
+test_output/
+test_data/
+.test_env
+test_results.json
+
+# Job_bro_AI specific
+*.sqlite3
+verification.sqlite3*
+master_profile.json
+
+# Temporary uploads
+tmp_uploads/
+temp_uploads/
+uploads/
+
+# Local documentation (keep only important docs)
+local_notes.md
+TODO.md
+NOTES.md
+notes/
+scratch/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GIT
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Git merge conflicts
+*.orig
+.merge_cache/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DOCKER (if used)
+# ─────────────────────────────────────────────────────────────────────────────
+
+.dockerignore
+docker-compose.override.yml
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CI/CD
+# ─────────────────────────────────────────────────────────────────────────────
+
+.github/workflows/secrets/
+CI_ENV_FILE
+
+# ═══════════════════════════════════════════════════════════════════════════
+# WHITELISTING - Files to ALWAYS COMMIT (override above patterns)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Do commit these important files:
+!.gitignore
+!.env.example
+!requirements.txt
+!manage.py
+!README.md
+!LICENSE
+!CONTRIBUTING.md
+!.github/
+
+# Documentation should be committed
+!docs/
+!docs/**/*.md
+
+# Templates should be committed
+!templates/
+!templates/**/*.html
+
+# Static files source should be committed
+!static/css/
+!static/css/**/*.css
+
+# Do commit clean migrations
+!/*/migrations/
+!/*/migrations/__init__.py
+!/*/migrations/*.py
+
+# ═══════════════════════════════════════════════════════════════════════════
+# COMMENTS & NOTES
+# ═══════════════════════════════════════════════════════════════════════════
+
+# This .gitignore is comprehensive and prioritizes:
+# 1. Security: API keys, credentials, tokens
+# 2. Privacy: Resume files, candidate profiles, PII
+# 3. Cleanliness: Build artifacts, logs, temp files
+# 4. Portability: Virtual environments
+#
+# IMPORTANT REMINDERS:
+# • Never commit .env files (use .env.example as template)
+# • Never commit resume PDFs or profile JSONs
+# • Never commit database files with real data
+# • Always verify before committing with: git status
+# • Use: git diff --cached (to review staged changes)
+# • Use: git add -p (for interactive staging)
+#
+# If you accidentally commit sensitive files:
+# git rm --cached <file>
+# git commit --amend
+# git push origin <branch> --force-with-lease  (use carefully!)
 
 # ── IDE / Editor ──────────────────────────────────────────────────
 .vscode/
