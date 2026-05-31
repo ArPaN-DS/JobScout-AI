@@ -10,23 +10,58 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+import importlib.util
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_int(name: str, default: int = 0) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    value = os.getenv(name, default)
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-g*-sf_xa^m@i7*^o345$^30cwktv4v199i72%&cz$wr@3nbgqx'
+# SECURITY WARNING: keep the secret key used in production secret.
+# This fallback is for local development only. Public deployments must set
+# DJANGO_SECRET_KEY to a long random value.
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "local-dev-only-change-me-before-deploying-job-bro-ai-secret-key-2026",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool("DJANGO_DEBUG", True)
 
-ALLOWED_HOSTS = ['*']  # Allow all for ngrok testing
-CSRF_TRUSTED_ORIGINS = ['https://*.ngrok-free.dev', 'http://*.ngrok-free.dev']
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    "https://*.ngrok-free.dev,http://*.ngrok-free.dev",
+)
 
 
 # Application definition
@@ -40,6 +75,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'core',
 ]
+
+if importlib.util.find_spec("django_q"):
+    INSTALLED_APPS.append("django_q")
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -73,11 +111,14 @@ WSGI_APPLICATION = 'career_agent.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+DB_PATH = Path(os.getenv("DJANGO_DB_PATH", "db.sqlite3"))
+if not DB_PATH.is_absolute():
+    DB_PATH = BASE_DIR / DB_PATH
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DB_PATH,
     }
 }
 
@@ -119,7 +160,93 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
+GEMINI_FLASH_MODEL = os.getenv("GEMINI_FLASH_MODEL", "gemini-2.5-flash")
+GEMINI_PRO_MODEL = os.getenv("GEMINI_PRO_MODEL", "gemini-2.5-pro")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+XAI_MODEL = os.getenv("XAI_MODEL", "grok-3-mini")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/auto")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+MOONSHOT_MODEL = os.getenv("MOONSHOT_MODEL", "kimi-k2.5")
+DASHSCOPE_MODEL = os.getenv("DASHSCOPE_MODEL", "qwen-plus")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_ENABLED = env_bool("OLLAMA_ENABLED", False)
+LLM_PROVIDER_ORDER = env_list(
+    "LLM_PROVIDER_ORDER",
+    "gemini,groq,openrouter,ollama,openai,anthropic,xai,deepseek,kimi,qwen",
+)
+LLM_HTTP_TIMEOUT_SECONDS = env_int("LLM_HTTP_TIMEOUT_SECONDS", 45)
+LLM_PROVIDER_COOLDOWN_SECONDS = env_int("LLM_PROVIDER_COOLDOWN_SECONDS", 90)
+MAX_RESUME_UPLOAD_MB = int(os.getenv("MAX_RESUME_UPLOAD_MB", "8"))
+UPLOAD_TEMP_DIR = BASE_DIR / "tmp_uploads"
+
+DEFAULT_MIN_MATCH_SCORE = env_int("DEFAULT_MIN_MATCH_SCORE", 60)
+DEFAULT_MIN_MATCH_CONFIDENCE = env_int("DEFAULT_MIN_MATCH_CONFIDENCE", 50)
+KIT_CRITIC_ENABLED = env_bool("KIT_CRITIC_ENABLED", True)
+
+DEFAULT_JOB_FRESHNESS_HOURS = env_int("DEFAULT_JOB_FRESHNESS_HOURS", 24)
+DISCOVERY_SOURCES = env_list(
+    "DISCOVERY_SOURCES",
+    "jobspy,remoteok,naukri,internshala,foundit,hirist,wellfound,ycombinator,greenhouse,lever,career_pages",
+)
+DISCOVERY_MAX_QUERIES = env_int("DISCOVERY_MAX_QUERIES", 12)
+ESTIMATED_MATCH_COST_USD = float(os.getenv("ESTIMATED_MATCH_COST_USD", "0.002"))
+ESTIMATED_KIT_COST_USD = float(os.getenv("ESTIMATED_KIT_COST_USD", "0.02"))
+ESTIMATED_TOKEN_COST_USD_PER_1K = float(os.getenv("ESTIMATED_TOKEN_COST_USD_PER_1K", "0.0005"))
+DAILY_LLM_BUDGET_USD = float(os.getenv("DAILY_LLM_BUDGET_USD", "2.0"))
+LLM_COMPACT_MAX_CHARS = env_int("LLM_COMPACT_MAX_CHARS", 1500)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("LOG_LEVEL", "INFO"),
+    },
+    "loggers": {
+        "core": {"level": os.getenv("LOG_LEVEL", "INFO"), "propagate": True},
+    },
+}
+
+AUTO_SUBMIT_ENABLED = env_bool("AUTO_SUBMIT_ENABLED", False)
+TELEGRAM_ALLOWED_CHAT_IDS = env_list("TELEGRAM_ALLOWED_CHAT_IDS", "")
+DISCORD_ALLOWED_IDS = env_list("DISCORD_ALLOWED_IDS", "")
+NOTIFICATION_WEBHOOK_URL = os.getenv("NOTIFICATION_WEBHOOK_URL", "")
+
+Q_CLUSTER = {
+    "name": "job_bro_ai",
+    "workers": env_int("DJANGO_Q_WORKERS", 2),
+    "timeout": env_int("DJANGO_Q_TIMEOUT", 120),
+    "retry": env_int("DJANGO_Q_RETRY", 180),
+    "queue_limit": env_int("DJANGO_Q_QUEUE_LIMIT", 50),
+    "bulk": env_int("DJANGO_Q_BULK", 5),
+    "orm": "default",
+}
+
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+SECURE_HSTS_SECONDS = env_int("DJANGO_SECURE_HSTS_SECONDS", 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", False)
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", False)
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
