@@ -211,7 +211,7 @@ When viewing a job, you see:
 
 If you want to generate only specific materials:
 
-1. Go to job detail → **"Application Kit"** section
+1. Go to job detail ' **"Application Kit"** section
 2. Click **"Generate Resume"** to customize resume only
 3. Click **"Generate Cover Letter"** to create cover letter
 4. Click **"Generate Messages"** for recruiter messages
@@ -383,9 +383,9 @@ Useful for:
 1. Find bot on Telegram: `@job_bro_ai_bot` (or your deployed bot)
 2. Click **"Start"** or send `/start`
 3. Bot asks for your verification code
-4. Get code from: Profile → Settings → **"Telegram Bot"** → Show Code
+4. Get code from: Profile ' Settings ' **"Telegram Bot"** ' Show Code
 5. Send code to bot on Telegram
-6. Confirmation: "✅ Account connected"
+6. Confirmation: " Account connected"
 
 ### Telegram Commands
 
@@ -416,7 +416,7 @@ Useful for:
 
 ### Generating Applications via Telegram
 
-1. Bot sends job: "🟢 Python Developer - TechCorp (85/100)"
+1. Bot sends job: " Python Developer - TechCorp (85/100)"
 2. Reply: `apply`
 3. Bot generates application (30-60 seconds)
 4. Bot sends back:
@@ -447,7 +447,7 @@ Useful for:
 ### LLM Providers Configuration
 
 Different AI providers can be used. Configure in:
-1. Go to **"Settings"** → **"Providers"**
+1. Go to **"Settings"** ' **"Providers"**
 2. Add your API keys
 3. Enable/disable providers
 
@@ -485,7 +485,7 @@ Different AI providers can be used. Configure in:
 
 ### Testing Providers
 
-1. Go to **"Settings"** → **"Providers"**
+1. Go to **"Settings"** ' **"Providers"**
 2. Click **"Test"** next to provider
 3. System sends test prompt
 4. See response quality and speed
@@ -498,7 +498,7 @@ System tries providers in order:
 2. Secondary providers (if primary fails)
 3. Fallback provider (always-working backup)
 
-Set in Settings → **"Provider Priority"**
+Set in Settings ' **"Provider Priority"**
 
 ---
 
@@ -518,7 +518,7 @@ Set in Settings → **"Provider Priority"**
 
 **To fix**:
 ```
-1. Check file size: File → Properties → Size
+1. Check file size: File ' Properties ' Size
 2. Convert to PDF if needed (use Google Docs, etc.)
 3. Wait 30 seconds and try again
 4. Check browser console for errors (F12)
@@ -551,7 +551,7 @@ Set in Settings → **"Provider Priority"**
 
 **To fix**:
 ```
-1. Go to Profile → Review section
+1. Go to Profile ' Review section
 2. Add more detailed skills with levels
 3. Ensure work experience is complete
 4. Re-match jobs after updating profile
@@ -569,7 +569,7 @@ Set in Settings → **"Provider Priority"**
 
 **To fix**:
 ```
-1. Go to Settings → Providers
+1. Go to Settings ' Providers
 2. Test each provider
 3. Check API key (valid and not expired)
 4. Wait 5 minutes (rate limit window)
@@ -587,7 +587,7 @@ Set in Settings → **"Provider Priority"**
 
 **To fix**:
 ```
-1. Go to Settings → Telegram → Generate New Code
+1. Go to Settings ' Telegram ' Generate New Code
 2. Copy full code
 3. In Telegram: /start
 4. Send code when bot asks
@@ -654,33 +654,33 @@ Set in Settings → **"Provider Priority"**
 #### Check LLM Provider Status
 
 ```
-Settings → Providers → Click "Test" next to each
+Settings ' Providers ' Click "Test" next to each
 ```
 
 #### View Recent Errors
 
 ```
-Admin → Logs → See recent application errors
+Admin ' Logs ' See recent application errors
 ```
 
 #### Check Database Connection
 
 ```
-Admin → System Health → Database Status
+Admin ' System Health ' Database Status
 ```
 
 #### View Task Queue Status
 
 ```
-Admin → Tasks → See pending/failed tasks
+Admin ' Tasks ' See pending/failed tasks
 ```
 
 ### Getting Help
 
 1. **Check documentation**: [docs/](../README.md#documentation)
 2. **Search existing issues**: [GitHub Issues](https://github.com/ArPaN-DS/Job_bro_AI/issues)
-3. **Report bug**: [GitHub Issues → New Issue](https://github.com/ArPaN-DS/Job_bro_AI/issues/new)
-4. **Email support**: arpanmajumdar952@gmail.com
+3. **Report bug**: [GitHub Issues -> New Issue](https://github.com/ArPaN-DS/Job_bro_AI/issues/new)
+4. **Security issue**: Use a private maintainer channel or GitHub security advisory when available.
 
 ### Enable Debug Logging
 
@@ -705,48 +705,47 @@ For development/debugging:
 
 ### For Better Job Matches
 
-1. ✅ **Complete profile**: Fill all sections
-2. ✅ **Accurate skills**: Use exact technology names
-3. ✅ **Clear experience**: Detail your accomplishments
-4. ✅ **Regular updates**: Keep profile current
-5. ❌ Don't: Leave fields blank or generic
+1.  **Complete profile**: Fill all sections
+2.  **Accurate skills**: Use exact technology names
+3.  **Clear experience**: Detail your accomplishments
+4.  **Regular updates**: Keep profile current
+5.  Don't: Leave fields blank or generic
 
 ### For Better Applications
 
-1. ✅ **Personalize materials**: Edit before sending
-2. ✅ **Proofread**: Check grammar and spelling
-3. ✅ **Research company**: Reference in cover letter
-4. ✅ **Follow instructions**: Read job posting carefully
-5. ✅ **Track everything**: Update application status
-6. ❌ Don't: Send generic applications
+1.  **Personalize materials**: Edit before sending
+2.  **Proofread**: Check grammar and spelling
+3.  **Research company**: Reference in cover letter
+4.  **Follow instructions**: Read job posting carefully
+5.  **Track everything**: Update application status
+6.  Don't: Send generic applications
 
 ### For Success
 
-1. 📊 **Monitor metrics**: Track response rate
-2. 📞 **Follow up**: Contact recruiters after 1 week
-3. 🎯 **Target strategically**: Focus on best matches
-4. 💼 **Prepare**: Study company before interview
-5. 🤝 **Network**: Reference from employees if possible
-6. 📈 **Iterate**: Refine approach based on results
+1. " **Monitor metrics**: Track response rate
+2. " **Follow up**: Contact recruiters after 1 week
+3.  **Target strategically**: Focus on best matches
+4. ' **Prepare**: Study company before interview
+5.  **Network**: Reference from employees if possible
+6. " **Iterate**: Refine approach based on results
 
 ---
 
 ## Keyboard Shortcuts
 
-- `G` → Go to Jobs page
-- `P` → Go to Profile page
-- `A` → Go to Applications page
-- `S` → Open Settings
-- `?` → Show this help menu
+- `G` ' Go to Jobs page
+- `P` ' Go to Profile page
+- `A` ' Go to Applications page
+- `S` ' Open Settings
+- `?` ' Show this help menu
 
 ---
 
 ## Contacting Support
 
-- **Email**: arpanmajumdar952@gmail.com
 - **GitHub**: [ArPaN-DS/Job_bro_AI](https://github.com/ArPaN-DS/Job_bro_AI)
 - **Issues**: [Report a bug](https://github.com/ArPaN-DS/Job_bro_AI/issues/new)
 
 ---
 
-**Happy job hunting! 🚀**
+**Happy job hunting! **
