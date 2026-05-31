@@ -13,14 +13,21 @@
 The current limitation is that the user must manually copy and paste job descriptions. Version 2 will automate this via a web-scraping and aggregation pipeline.
 
 **Core Features of Version 2:**
-1. **Scraping Engine:** A Python background worker (using BeautifulSoup / Selenium / or a Job API) that continuously queries platforms (LinkedIn, Indeed, Startup boards) for roles like "NLP Engineer" or "Generative AI Developer".
+1. **Scraping Engine:** A Python background worker (using Playwright or Selenium) that continuously queries major platforms:
+   - **LinkedIn**
+   - **Naukri**
+   - **Glassdoor**
+   - **Indeed**
+   
+   *Critical Constraint:* The scrapers will be strictly configured to only pull jobs posted in the **Last 24 Hours**. This ensures you are always applying to fresh roles before the applicant pool gets saturated.
 2. **Auto-Filtering:** As jobs stream in, they are immediately passed through the Match Engine. If the score is `< 60%`, the job is silently discarded.
 3. **Daily Digest UI:** The dashboard will display a queue of highly relevant automatically discovered jobs. 
 4. **1-Click Kit Prep:** From the queue, the user can click one button to generate Kits for all matched jobs before deciding which ones to formally submit.
 
 ## 3. How We Need to Build This (Architecture)
 - **Backend Worker:** We will integrate `Celery` or Django Q as a robust asynchronous task queue locally, backed by `Redis` or SQLite.
-- **Scraping Agents:** We will build small modular scripts (`scrapers/linkedin.py`, `scrapers/ycombinator.py`) that run on a cron schedule within the celery worker.
+- **Scraping Agents:** We will build small modular scripts (`scrapers/linkedin.py`, `scrapers/ycombinator.py`) that run on a cron schedule within the celery worker. 
+  - *Note on Scraping Methodology:* Instead of writing brittle HTML parsers (XPath/CSS selectors) that break when sites update, we will leverage **Gemini 2.0 Flash's Multimodal** capabilities. The scraper simply needs to download the raw HTML payload (or use Playwright to take a full-page screenshot), and we pass that raw blob directly to Gemini 2.0 Flash with a prompt to extract the job data into structured JSON. This makes the scraper incredibly resilient.
 - **Data Persistence:** Extend the [Application](file:///d:/Job_finder_AI/core/models.py#4-21) Django model to track the "Status" of a job (e.g., `Scraped`, `Low Match`, `Matched`, `Generated`, `Submitted`).
 - **Dashboard UI:** Add a new tab `Auto-Queue` that queries the database heavily relying on AJAX for asynchronous updates.
 
