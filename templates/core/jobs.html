@@ -6,120 +6,136 @@
 {% block content %}
 
 {% if not has_profile %}
-<div class="card warning-card">
-    <div class="card-header">
-        <h2>⚠️ Action Required</h2>
-        <p>You must set up your Master Profile before you can match jobs. Please go to the Master Profile tab and upload
-            your resume.</p>
-        <a href="{% url 'profile_setup' %}" class="btn btn-primary mt-4">Go to Master Profile</a>
+<section class="panel warning-panel">
+    <div class="panel-header">
+        <div>
+            <h2>Candidate profile required</h2>
+            <p>Create a candidate profile before scoring jobs or generating application kits.</p>
+        </div>
+        <a href="{% url 'profile_setup' %}" class="btn btn-primary">Open Profile</a>
     </div>
-</div>
+</section>
 {% else %}
-<div class="grid layout-grid">
-    <!-- Left Column: Input Form -->
-    <div class="card premium-card form-column">
-        <div class="card-header">
-            <h2>Find Your Match</h2>
-            <p>Paste a job description and URL below to see how well your profile aligns with the role.</p>
+<div class="workspace-grid">
+    <section class="panel">
+        <div class="panel-header">
+            <div>
+                <h2>Score a Role</h2>
+                <p>Paste the full job description. The score is based only on the saved candidate profile.</p>
+            </div>
         </div>
 
         <form id="job-form" class="modern-form">
             {% csrf_token %}
 
-            <div class="form-group mb-4">
-                <div class="input-field">
-                    <label for="job_url">Job Post URL (Optional)</label>
-                    <input type="url" id="job_url" name="job_url" placeholder="https://linkedin.com/jobs/view/123">
-                </div>
+            <div class="input-field">
+                <label for="job_url">Job Post URL</label>
+                <input type="url" id="job_url" name="job_url" placeholder="https://example.com/jobs/123">
             </div>
 
-            <div class="form-group">
-                <div class="input-field">
-                    <label for="job_description">Raw Job Description Text</label>
-                    <textarea id="job_description" name="job_description" rows="10"
-                        placeholder="Paste the full job description here..." required></textarea>
-                </div>
+            <div class="input-field">
+                <label for="job_description">Job Description</label>
+                <textarea id="job_description" name="job_description" rows="13"
+                    placeholder="Paste the full job description here" required></textarea>
             </div>
 
-            <div class="form-actions mt-6">
-                <button type="submit" class="btn btn-primary btn-glow full-width" id="match-btn">
-                    <span class="btn-text">Analyze Match with Gemini ✨</span>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary full-width" id="match-btn">
+                    <span class="btn-text">Analyze Match</span>
                     <span class="spinner hidden"></span>
                 </button>
             </div>
 
-            <div id="error-banner" class="mt-4 hidden"
-                style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 4px; color: #ef4444; word-wrap: break-word;">
+            <div id="error-banner" class="alert error hidden">
                 <strong>Error:</strong> <span id="error-text"></span>
             </div>
         </form>
-    </div>
+    </section>
 
-    <!-- Right Column: Results -->
-    <div class="results-column hidden" id="results-area">
-        <div class="card match-card">
-
-            <div class="score-container">
-                <div class="score-circle">
-                    <svg viewBox="0 0 36 36" class="circular-chart">
-                        <path class="circle-bg" d="M18 2.0845
-                        a 15.9155 15.9155 0 0 1 0 31.831
-                        a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <path class="circle" id="score-ring" stroke-dasharray="0, 100" d="M18 2.0845
-                        a 15.9155 15.9155 0 0 1 0 31.831
-                        a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        <text x="18" y="20.35" class="percentage" id="score-text">0%</text>
-                    </svg>
-                </div>
-                <div class="score-info">
-                    <h3 id="score-label">Match Score</h3>
-                    <p id="summary-text" class="summary-text">Analyzing...</p>
-                </div>
+    <aside class="panel results-column hidden" id="results-area">
+        <div class="score-container">
+            <div class="score-circle">
+                <svg viewBox="0 0 36 36" class="circular-chart">
+                    <path class="circle-bg" d="M18 2.0845
+                    a 15.9155 15.9155 0 0 1 0 31.831
+                    a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="circle" id="score-ring" stroke-dasharray="0, 100" d="M18 2.0845
+                    a 15.9155 15.9155 0 0 1 0 31.831
+                    a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <text x="18" y="20.35" class="percentage" id="score-text">0%</text>
+                </svg>
             </div>
-
-            <div class="skills-breakdown mt-6">
-                <div class="skill-category">
-                    <h4>✅ Matching Skills</h4>
-                    <ul id="matching-skills-list" class="skill-tags match"></ul>
-                </div>
-
-                <div class="skill-category mt-4">
-                    <h4>❌ Missing Skills</h4>
-                    <ul id="missing-skills-list" class="skill-tags miss"></ul>
+            <div class="score-info">
+                <span class="eyebrow">Match Score</span>
+                <h3 id="score-label">Awaiting analysis</h3>
+                <p id="summary-text" class="summary-text">Results will appear here.</p>
+                <p id="why-apply-text" class="summary-text muted-text"></p>
+                <div class="match-meta hidden" id="match-meta">
+                    <span>Confidence: <strong id="confidence-text">0%</strong></span>
                 </div>
             </div>
-
-            <div class="form-actions mt-6 action-area">
-                <input type="hidden" id="current-app-id" value="">
-                <button type="button" class="btn btn-primary btn-glow" id="generate-kit-btn" disabled>
-                    <span class="btn-text">🪄 Generate Application Kit (Gemini Pro)</span>
-                    <span class="spinner hidden"></span>
-                </button>
-            </div>
-
-            <div id="right-error-banner" class="mt-4 hidden"
-                style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 4px; color: #ef4444; word-wrap: break-word;">
-                <strong>Error:</strong> <span id="right-error-text"></span>
-            </div>
-
-            <!-- Application Kit Area (Hidden initially) -->
-            <div id="app-kit-area" class="mt-6 hidden">
-                <div class="card kit-card">
-                    <h4>Tailored Resume Points</h4>
-                    <pre id="resume-viewer" class="json-viewer mt-2"></pre>
-
-                    <h4 class="mt-4">Cover Letter Draft</h4>
-                    <div id="cover-letter-viewer" class="email-viewer mt-2"></div>
-
-                    <button type="button" class="btn btn-success mt-4 full-width" id="submit-btn">
-                        <span class="btn-text">✅ Mark as Submitted</span>
-                        <span class="spinner hidden"></span>
-                    </button>
-                </div>
-            </div>
-
         </div>
-    </div>
+
+        <div class="skills-breakdown">
+            <div class="skill-category">
+                <h4>Matching Skills</h4>
+                <ul id="matching-skills-list" class="skill-tags match"></ul>
+            </div>
+
+            <div class="skill-category">
+                <h4>Missing Skills</h4>
+                <ul id="missing-skills-list" class="skill-tags miss"></ul>
+            </div>
+
+            <div class="skill-category hidden" id="risk-flags-section">
+                <h4>Risk Flags</h4>
+                <ul id="risk-flags-list" class="risk-list"></ul>
+            </div>
+
+            <div class="skill-category hidden" id="hard-filters-section">
+                <h4>Hard Filters</h4>
+                <ul id="hard-filters-list" class="risk-list"></ul>
+            </div>
+        </div>
+
+        <div class="form-actions action-area">
+            <input type="hidden" id="current-app-id" value="">
+            <button type="button" class="btn btn-secondary full-width" id="generate-kit-btn" disabled>
+                <span class="btn-text">Generate Application Kit</span>
+                <span class="spinner hidden"></span>
+            </button>
+        </div>
+
+        <div id="right-error-banner" class="alert error hidden">
+            <strong>Error:</strong> <span id="right-error-text"></span>
+        </div>
+
+        <div id="app-kit-area" class="kit-area hidden">
+            <div class="panel-header compact">
+                <h3>Application Kit</h3>
+            </div>
+
+            <h4>Tailored Resume JSON</h4>
+            <pre id="resume-viewer" class="json-viewer"></pre>
+
+            <h4>Cover Letter Draft</h4>
+            <div id="cover-letter-viewer" class="email-viewer"></div>
+
+            <h4>Recruiter Message</h4>
+            <div id="recruiter-message-viewer" class="email-viewer compact-viewer"></div>
+
+            <h4>Follow-up Message</h4>
+            <div id="follow-up-message-viewer" class="email-viewer compact-viewer"></div>
+
+            <h4>Interview Prep Notes</h4>
+            <ul id="interview-notes-list" class="risk-list"></ul>
+
+            <button type="button" class="btn btn-success full-width" id="submit-btn">
+                <span class="btn-text">Mark as Submitted</span>
+                <span class="spinner hidden"></span>
+            </button>
+        </div>
+    </aside>
 </div>
 {% endif %}
 
@@ -129,110 +145,107 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('job-form');
-        if (!form) return; // If no profile, form doesn't exist.
+        if (!form) return;
 
         const matchBtn = document.getElementById('match-btn');
         const btnText = matchBtn.querySelector('.btn-text');
         const spinner = matchBtn.querySelector('.spinner');
-
         const resultsArea = document.getElementById('results-area');
         const scoreRing = document.getElementById('score-ring');
         const scoreText = document.getElementById('score-text');
+        const scoreLabel = document.getElementById('score-label');
         const summaryText = document.getElementById('summary-text');
+        const whyApplyText = document.getElementById('why-apply-text');
         const matchingList = document.getElementById('matching-skills-list');
         const missingList = document.getElementById('missing-skills-list');
+        const riskFlagsSection = document.getElementById('risk-flags-section');
+        const riskFlagsList = document.getElementById('risk-flags-list');
+        const hardFiltersSection = document.getElementById('hard-filters-section');
+        const hardFiltersList = document.getElementById('hard-filters-list');
+        const matchMeta = document.getElementById('match-meta');
+        const confidenceText = document.getElementById('confidence-text');
+        const errorBanner = document.getElementById('error-banner');
+        const errorText = document.getElementById('error-text');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        const fillList = (target, items) => {
+            target.innerHTML = '';
+            (items || []).forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                target.appendChild(li);
+            });
+        };
 
-            // UI Loading state
-            btnText.textContent = "Analyzing Details...";
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            btnText.textContent = 'Analyzing...';
             matchBtn.disabled = true;
             spinner.classList.remove('hidden');
             resultsArea.classList.remove('hidden');
-            resultsArea.style.opacity = "0.5";
-
-            const formData = new FormData(form);
+            resultsArea.classList.add('loading');
+            errorBanner.classList.add('hidden');
 
             try {
                 const response = await fetch('{% url "job_discovery" %}', {
                     method: 'POST',
-                    body: formData,
+                    body: new FormData(form),
                     headers: {
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     }
                 });
-
                 const json = await response.json();
 
-                if (response.ok) {
-                    const data = json.data;
-
-                    // Update Score
-                    scoreText.textContent = data.match_score + '%';
-                    scoreRing.setAttribute('stroke-dasharray', `${data.match_score}, 100`);
-
-                    // Color logic for ring
-                    if (data.match_score >= 80) scoreRing.style.stroke = '#10b981'; // Green
-                    else if (data.match_score >= 50) scoreRing.style.stroke = '#f59e0b'; // Yellow
-                    else scoreRing.style.stroke = '#ef4444'; // Red
-
-                    // Update summary
-                    summaryText.textContent = data.summary;
-
-                    // Update Skills
-                    matchingList.innerHTML = '';
-                    data.matching_skills.forEach(skill => {
-                        const li = document.createElement('li');
-                        li.textContent = skill;
-                        matchingList.appendChild(li);
-                    });
-
-                    missingList.innerHTML = '';
-                    data.missing_skills.forEach(skill => {
-                        const li = document.createElement('li');
-                        li.textContent = skill;
-                        missingList.appendChild(li);
-                    });
-
-                    resultsArea.style.opacity = "1";
-
-                    // Enable Phase 3 Button
-                    const appIdInput = document.getElementById('current-app-id');
-                    const genBtn = document.getElementById('generate-kit-btn');
-                    appIdInput.value = json.app_id;
-                    genBtn.disabled = false;
-                    genBtn.classList.remove('btn-secondary');
-                    genBtn.classList.add('btn-primary');
-
-                    document.getElementById('error-banner').classList.add('hidden');
-
-                } else {
-                    document.getElementById('error-banner').classList.remove('hidden');
-                    document.getElementById('error-text').textContent = json.error || ('Server error: ' + response.status);
-                    resultsArea.classList.add('hidden');
+                if (!response.ok) {
+                    throw new Error(json.error || `Server error: ${response.status}`);
                 }
 
+                const data = json.data;
+                const score = Number(data.match_score || 0);
+
+                scoreText.textContent = `${score}%`;
+                scoreRing.setAttribute('stroke-dasharray', `${score}, 100`);
+                scoreRing.style.stroke = score >= 80 ? '#16835f' : score >= 60 ? '#a16207' : '#c2410c';
+                scoreLabel.textContent = score >= 80 ? 'Strong fit' : score >= 60 ? 'Possible fit' : 'Weak fit';
+                summaryText.textContent = data.summary;
+                whyApplyText.textContent = data.why_apply || '';
+                confidenceText.textContent = `${Number(data.confidence || 0)}%`;
+                matchMeta.classList.remove('hidden');
+
+                fillList(matchingList, data.matching_skills);
+                fillList(missingList, data.missing_skills);
+                fillList(riskFlagsList, data.risk_flags);
+                riskFlagsSection.classList.toggle('hidden', !(data.risk_flags || []).length);
+                fillList(hardFiltersList, data.hard_filters);
+                hardFiltersSection.classList.toggle('hidden', !(data.hard_filters || []).length);
+
+                const appIdInput = document.getElementById('current-app-id');
+                const genBtn = document.getElementById('generate-kit-btn');
+                appIdInput.value = json.app_id;
+                genBtn.disabled = false;
+                genBtn.classList.remove('btn-secondary');
+                genBtn.classList.add('btn-primary');
             } catch (error) {
-                document.getElementById('error-banner').classList.remove('hidden');
-                document.getElementById('error-text').textContent = 'Network Error / Disconnected: ' + error.message;
-                console.error(error);
+                errorBanner.classList.remove('hidden');
+                errorText.textContent = error.message;
                 resultsArea.classList.add('hidden');
             } finally {
-                // Restore UI
-                btnText.textContent = "Analyze Match with Gemini ✨";
+                resultsArea.classList.remove('loading');
+                btnText.textContent = 'Analyze Match';
                 matchBtn.disabled = false;
                 spinner.classList.add('hidden');
             }
         });
 
-        // Generate Kit Logic
         const genBtn = document.getElementById('generate-kit-btn');
         const genBtnText = genBtn.querySelector('.btn-text');
         const genSpinner = genBtn.querySelector('.spinner');
         const kitArea = document.getElementById('app-kit-area');
         const resumeViewer = document.getElementById('resume-viewer');
         const coverLetterViewer = document.getElementById('cover-letter-viewer');
+        const recruiterMessageViewer = document.getElementById('recruiter-message-viewer');
+        const followUpMessageViewer = document.getElementById('follow-up-message-viewer');
+        const interviewNotesList = document.getElementById('interview-notes-list');
         const submitBtn = document.getElementById('submit-btn');
 
         genBtn.addEventListener('click', async () => {
@@ -240,7 +253,7 @@
             if (!appId) return;
 
             genBtn.disabled = true;
-            genBtnText.textContent = "Crafting Kit...";
+            genBtnText.textContent = 'Generating...';
             genSpinner.classList.remove('hidden');
             kitArea.classList.add('hidden');
 
@@ -257,37 +270,37 @@
                 });
                 const json = await response.json();
 
-                if (response.ok) {
-                    resumeViewer.textContent = JSON.stringify(json.data.tailored_resume, null, 2);
-                    coverLetterViewer.innerHTML = json.data.cover_letter.replace(/\n/g, '<br>');
-                    kitArea.classList.remove('hidden');
-                    document.getElementById('right-error-banner').classList.add('hidden');
-                } else {
-                    document.getElementById('right-error-banner').classList.remove('hidden');
-                    document.getElementById('right-error-text').textContent = 'Error generating kit: ' + (json.error || response.status);
+                if (!response.ok) {
+                    throw new Error(json.error || `Server error: ${response.status}`);
                 }
-            } catch (e) {
+
+                resumeViewer.textContent = JSON.stringify(json.data.tailored_resume, null, 2);
+                coverLetterViewer.textContent = json.data.cover_letter;
+                recruiterMessageViewer.textContent = json.data.recruiter_message || '';
+                followUpMessageViewer.textContent = json.data.follow_up_message || '';
+                fillList(interviewNotesList, json.data.interview_prep_notes);
+                kitArea.classList.remove('hidden');
+                document.getElementById('right-error-banner').classList.add('hidden');
+            } catch (error) {
                 document.getElementById('right-error-banner').classList.remove('hidden');
-                document.getElementById('right-error-text').textContent = 'Connection error building kit: ' + e.message;
+                document.getElementById('right-error-text').textContent = error.message;
             } finally {
                 genBtn.disabled = false;
-                genBtnText.textContent = "🪄 Regenerate Application Kit";
+                genBtnText.textContent = 'Regenerate Application Kit';
                 genSpinner.classList.add('hidden');
             }
         });
 
-        // Submit Logic
         submitBtn.addEventListener('click', async () => {
             const appId = document.getElementById('current-app-id').value;
             const subText = submitBtn.querySelector('.btn-text');
             const subSpinner = submitBtn.querySelector('.spinner');
-
-            submitBtn.disabled = true;
-            subText.textContent = "Saving...";
-            subSpinner.classList.remove('hidden');
-
             const formData = new FormData();
             formData.append('app_id', appId);
+
+            submitBtn.disabled = true;
+            subText.textContent = 'Saving...';
+            subSpinner.classList.remove('hidden');
 
             try {
                 const response = await fetch('{% url "mark_submitted" %}', {
@@ -299,23 +312,18 @@
                 });
                 const json = await response.json();
 
-                if (response.ok) {
-                    subText.textContent = "🎉 Tracked Successfully!";
-                    subSpinner.classList.add('hidden');
-                    submitBtn.classList.replace('btn-success', 'btn-primary');
-                    document.getElementById('error-banner').classList.add('hidden');
-                } else {
-                    document.getElementById('error-banner').classList.remove('hidden');
-                    document.getElementById('error-text').textContent = 'Error saving: ' + (json.error || response.status);
-                    submitBtn.disabled = false;
-                    subText.textContent = "✅ Mark as Submitted";
-                    subSpinner.classList.add('hidden');
+                if (!response.ok) {
+                    throw new Error(json.error || `Server error: ${response.status}`);
                 }
-            } catch (e) {
-                document.getElementById('error-banner').classList.remove('hidden');
-                document.getElementById('error-text').textContent = 'Connection error tracking app: ' + e.message;
+
+                subText.textContent = 'Submitted';
+                submitBtn.classList.replace('btn-success', 'btn-primary');
+            } catch (error) {
+                errorBanner.classList.remove('hidden');
+                errorText.textContent = error.message;
                 submitBtn.disabled = false;
-                subText.textContent = "✅ Mark as Submitted";
+                subText.textContent = 'Mark as Submitted';
+            } finally {
                 subSpinner.classList.add('hidden');
             }
         });
