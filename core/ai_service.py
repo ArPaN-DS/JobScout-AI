@@ -9,8 +9,23 @@ from django.conf import settings
 from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 
+from .cost_tracking import assert_within_budget, record_llm_usage
 from .llm import LLMExhaustedError, LLMRequest, LLMResult, LLMRouter, LLMTask
-from .schemas import ApplicationKit, BaseJobExtraction, MasterProfile, MatchResult, validate_grounded_kit
+from .prompts.registry import (
+    PROMPT_VERSION,
+    build_application_kit_prompt,
+    build_critic_prompt,
+    build_job_match_prompt,
+    build_profile_extract_prompt,
+)
+from .schemas import (
+    ApplicationKit,
+    BaseJobExtraction,
+    KitCriticVerdict,
+    MasterProfile,
+    MatchResult,
+    validate_grounded_kit,
+)
 
 load_dotenv()
 
@@ -21,6 +36,10 @@ class AIResponseError(ValueError):
     pass
 
 
+class KitValidationError(AIResponseError):
+    """Raised when deterministic or critic validation rejects a kit."""
+
+
 class CareerAgentAI:
     def __init__(
         self,
@@ -29,60 +48,27 @@ class CareerAgentAI:
         pro_model: str | None = None,
         max_attempts: int = 2,
         router: LLMRouter | None = None,
+        critic_enabled: bool | None = None,
     ) -> None:
         self.api_key = api_key
         self.flash_model = flash_model or getattr(settings, "GEMINI_FLASH_MODEL", "gemini-2.5-flash")
         self.pro_model = pro_model or getattr(settings, "GEMINI_PRO_MODEL", "gemini-2.5-pro")
         self.max_attempts = max_attempts
         self.router = router or LLMRouter()
+        self.critic_enabled = (
+            critic_enabled
+            if critic_enabled is not None
+            else getattr(settings, "KIT_CRITIC_ENABLED", True)
+        )
         self.last_result: LLMResult | None = None
+        self.last_prompt_version = PROMPT_VERSION
+        self._run_extras: dict[str, Any] = {}
 
     def extract_profile_from_document(self, document_path: str | Path) -> MasterProfile:
         resume_text = extract_document_text(document_path)
-        prompt = f"""
-You are a careful technical recruiter. Extract the candidate profile from the resume text.
-
-Rules:
-- Return JSON only.
-- Do not invent missing fields.
-- Preserve exact company names, role titles, durations, skills, and experience highlights from the resume.
-- Keep skills atomic, for example "Python" instead of "Python and Django".
-
-JSON shape:
-{{
-  "name": "Full Name",
-  "email": "Email Address",
-  "phone": "Phone Number",
-  "skills": ["Skill"],
-  "experience": [
-    {{
-      "company": "Company Name",
-      "role": "Job Title",
-      "duration": "Start - End Date",
-      "highlights": ["Evidence-backed resume bullet"],
-      "evidence": ["Short quote or resume fact supporting the highlight"]
-    }}
-  ],
-  "domains": ["Domain"],
-  "job_preferences": {{
-    "target_roles": [],
-    "locations": [],
-    "remote_preferences": [],
-    "min_salary": "",
-    "experience_level": "",
-    "visa_status": "",
-    "blocked_companies": [],
-    "must_have_skills": []
-  }},
-  "evidence_notes": ["Important source facts from the resume"]
-}}
-
-Resume text:
-{resume_text}
-"""
         return self._generate_json(
             task=LLMTask.PROFILE_EXTRACT,
-            prompt=prompt,
+            prompt=build_profile_extract_prompt(resume_text),
             schema=MasterProfile,
             temperature=0.1,
             purpose="profile extraction",
@@ -91,102 +77,88 @@ Resume text:
     def extract_profile_from_pdf(self, pdf_path: str | Path) -> MasterProfile:
         return self.extract_profile_from_document(pdf_path)
 
-    def match_job_to_profile(self, master_profile: dict[str, Any] | MasterProfile, job_description: str) -> MatchResult:
+    def match_job_to_profile(
+        self,
+        master_profile: dict[str, Any] | MasterProfile,
+        job_description: str,
+        *,
+        compact: bool = False,
+    ) -> MatchResult:
         profile = ensure_profile(master_profile)
-        prompt = f"""
-You are a conservative recruiting analyst. Compare the candidate profile with the job description.
-
-Accuracy rules:
-- Score only skills and experience explicitly present in the candidate profile.
-- Do not give credit for adjacent or implied skills unless the profile states them directly.
-- Put uncertain or weak evidence in risk_flags.
-- Respect job_preferences as hard filters when the job conflicts with them.
-- Keep the summary factual and concise.
-
-JSON shape:
-{{
-  "match_score": 0,
-  "summary": "Two factual sentences.",
-  "matching_skills": ["Skill found in both job and profile"],
-  "missing_skills": ["Important job skill not found in profile"],
-  "confidence": 0,
-  "risk_flags": ["Reason this match may be weaker than the score suggests"],
-  "hard_filters": ["Deal-breaker mismatch, if any"],
-  "why_apply": "One practical reason this role is worth applying to.",
-  "salary_signal": "Salary or compensation signal if present.",
-  "seniority_alignment": "How the role level aligns with the profile."
-}}
-
-Candidate profile JSON:
-{json.dumps(profile.to_storage_dict(), ensure_ascii=False)}
-
-Job description:
-{job_description.strip()}
-"""
-        return self._generate_json(
+        description = _compact_text(job_description) if compact else job_description
+        assert_within_budget(float(getattr(settings, "ESTIMATED_MATCH_COST_USD", 0.002)))
+        result = self._generate_json(
             task=LLMTask.JOB_MATCH,
-            prompt=prompt,
+            prompt=build_job_match_prompt(profile.to_storage_dict(), description),
             schema=MatchResult,
             temperature=0.1,
             purpose="job match",
         )
+        record_llm_usage(self.last_metadata(), task_type="job_match")
+        return result
 
     def generate_application_kit(
         self,
         master_profile: dict[str, Any] | MasterProfile,
         job_description: str,
+        *,
+        compact: bool = False,
     ) -> ApplicationKit:
         profile = ensure_profile(master_profile)
-        prompt = f"""
-You are a strict resume tailoring assistant. Build a targeted application kit.
-
-Grounding rules:
-- Use only facts present in the candidate profile JSON.
-- Use exact skill strings from candidate_profile.skills. Do not create new skill names.
-- Use exact company, role, and duration values from candidate_profile.experience.
-- You may rephrase existing highlights for clarity, but you may not add new tools, metrics, employers, dates, or outcomes.
-- If the job asks for a missing skill, do not include it in the resume.
-
-JSON shape:
-{{
-  "tailored_resume": {{
-    "name": "Candidate Name",
-    "skills": ["Exact skill from candidate_profile.skills"],
-    "experience": [
-      {{
-        "company": "Exact company from profile",
-        "role": "Exact role from profile",
-        "duration": "Exact duration from profile",
-        "highlights": ["Rephrased but evidence-backed highlight"]
-      }}
-    ]
-  }},
-  "cover_letter": "Professional 3-paragraph cover letter grounded only in profile facts.",
-  "recruiter_message": "Short LinkedIn or email message grounded only in profile facts.",
-  "follow_up_message": "Short follow-up message after applying.",
-  "interview_prep_notes": ["Concrete interview prep note based on job and profile"]
-}}
-
-Candidate profile JSON:
-{json.dumps(profile.to_storage_dict(), ensure_ascii=False)}
-
-Job description:
-{job_description.strip()}
-"""
+        description = _compact_text(job_description) if compact else job_description
+        assert_within_budget(float(getattr(settings, "ESTIMATED_KIT_COST_USD", 0.02)))
         kit = self._generate_json(
             task=LLMTask.APPLICATION_KIT,
-            prompt=prompt,
+            prompt=build_application_kit_prompt(profile.to_storage_dict(), description),
             schema=ApplicationKit,
             temperature=0.2,
             purpose="application kit generation",
         )
         validate_grounded_kit(profile, kit)
+
+        critic_metadata: dict[str, Any] = {"skipped": True}
+        if self.critic_enabled:
+            verdict = self.critic_validate_kit(profile, job_description, kit)
+            critic_metadata = verdict.model_dump(mode="json")
+            if not verdict.approved:
+                issues = verdict.issues or verdict.unsupported_claims or ["Critic rejected the kit."]
+                raise KitValidationError(
+                    "Application kit failed critic validation: " + "; ".join(issues[:5])
+                )
+
+        self._run_extras = {
+            "prompt_version": PROMPT_VERSION,
+            "critic": critic_metadata,
+            "compact": compact,
+        }
+        record_llm_usage(self.last_metadata(), task_type="application_kit")
         return kit
 
+    def critic_validate_kit(
+        self,
+        master_profile: dict[str, Any] | MasterProfile,
+        job_description: str,
+        kit: ApplicationKit,
+    ) -> KitCriticVerdict:
+        profile = ensure_profile(master_profile)
+        return self._generate_json(
+            task=LLMTask.CRITIC_VALIDATE,
+            prompt=build_critic_prompt(
+                profile.to_storage_dict(),
+                job_description,
+                kit.model_dump(mode="json"),
+            ),
+            schema=KitCriticVerdict,
+            temperature=0.0,
+            purpose="kit critic validation",
+        )
+
     def last_metadata(self) -> dict[str, Any]:
-        if not self.last_result:
-            return {}
-        return self.last_result.metadata()
+        metadata: dict[str, Any] = {"prompt_version": self.last_prompt_version}
+        if self.last_result:
+            metadata.update(self.last_result.metadata())
+        metadata.update(self._run_extras)
+        return metadata
 
     def _generate_json(
         self,
@@ -267,6 +239,14 @@ Raw text:
             purpose="job extraction",
         )
         return result.model_dump(mode="json")
+
+
+def _compact_text(text: str, max_chars: int | None = None) -> str:
+    limit = max_chars or int(getattr(settings, "LLM_COMPACT_MAX_CHARS", 1500))
+    cleaned = (text or "").strip()
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[:limit] + "\n\n[Description truncated for compact retry.]"
 
 
 def ensure_profile(profile: dict[str, Any] | MasterProfile) -> MasterProfile:
