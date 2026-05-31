@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Job Preferences | AI Career Agent{% endblock %}
+{% block page_title %}Job Preferences{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Candidate Preferences</h2>
+            <p>These settings personalize search queries, filters, and job ranking.</p>
+        </div>
+    </div>
+
+    {% if candidate %}
+    <form method="post" class="modern-form">
+        {% csrf_token %}
+        <div class="form-grid">
+            <div class="input-field">
+                <label for="target_roles">Target Roles</label>
+                <input type="text" id="target_roles" name="target_roles" value="{% if preferences and preferences.target_roles %}{{ preferences.target_roles|join:', ' }}{% endif %}" placeholder="Comma-separated">
+            </div>
+            <div class="input-field">
+                <label for="target_locations">Target Locations</label>
+                <input type="text" id="target_locations" name="target_locations" value="{% if preferences and preferences.target_locations %}{{ preferences.target_locations|join:', ' }}{% endif %}" placeholder="Comma-separated">
+            </div>
+            <div class="input-field">
+                <label for="remote_preferences">Remote Preferences</label>
+                <input type="text" id="remote_preferences" name="remote_preferences" value="{% if preferences and preferences.remote_preferences %}{{ preferences.remote_preferences|join:', ' }}{% endif %}" placeholder="Remote, Hybrid">
+            </div>
+            <div class="input-field">
+                <label for="must_have_skills">Must-have Skills</label>
+                <input type="text" id="must_have_skills" name="must_have_skills" value="{% if preferences and preferences.must_have_skills %}{{ preferences.must_have_skills|join:', ' }}{% endif %}" placeholder="Comma-separated">
+            </div>
+            <div class="input-field">
+                <label for="salary_range">Salary Range</label>
+                <input type="text" id="salary_range" name="salary_range" value="{{ preferences.salary_range|default:'' }}">
+            </div>
+            <div class="input-field">
+                <label for="experience_level">Experience Level</label>
+                <input type="text" id="experience_level" name="experience_level" value="{{ preferences.experience_level|default:'' }}">
+            </div>
+            <div class="input-field">
+                <label for="work_authorization">Work Authorization</label>
+                <input type="text" id="work_authorization" name="work_authorization" value="{{ preferences.work_authorization|default:'' }}">
+            </div>
+            <div class="input-field">
+                <label for="blocked_companies">Blocked Companies</label>
+                <input type="text" id="blocked_companies" name="blocked_companies" value="{% if preferences and preferences.blocked_companies %}{{ preferences.blocked_companies|join:', ' }}{% endif %}" placeholder="Comma-separated">
+            </div>
+            <div class="input-field">
+                <label for="job_freshness_hours">Job Freshness (hours)</label>
+                <input type="number" id="job_freshness_hours" name="job_freshness_hours" min="1" max="168"
+                    value="{{ preferences.job_freshness_hours|default:24 }}">
+            </div>
+            <div class="input-field">
+                <label for="discovery_sources">Discovery Sources (comma-separated IDs)</label>
+                <input type="text" id="discovery_sources" name="discovery_sources"
+                    value="{% if preferences.discovery_sources %}{{ preferences.discovery_sources|join:', ' }}{% else %}jobspy, remoteok, naukri{% endif %}"
+                    placeholder="jobspy, remoteok, naukri">
+            </div>
+            <div class="input-field">
+                <label for="min_match_score">Minimum Match Score (%)</label>
+                <input type="number" id="min_match_score" name="min_match_score" min="0" max="100"
+                    value="{{ preferences.min_match_score|default:60 }}">
+            </div>
+            <div class="input-field">
+                <label for="min_match_confidence">Minimum Match Confidence (%)</label>
+                <input type="number" id="min_match_confidence" name="min_match_confidence" min="0" max="100"
+                    value="{{ preferences.min_match_confidence|default:50 }}">
+            </div>
+            <div class="input-field">
+                <label for="resume_source">Resume Source</label>
+                <select id="resume_source" name="resume_source" style="width: 100%; border: 1px solid var(--border); border-radius: 8px; background: #ffffff; color: var(--ink); padding: 11px 12px; outline: none; transition: border-color var(--transition), box-shadow var(--transition);">
+                    <option value="claims" {% if preferences and preferences.resume_source == "claims" %}selected{% endif %}>DB Claims Assembled (Dynamic)</option>
+                    <option value="document" {% if preferences and preferences.resume_source == "document" %}selected{% endif %}>Uploaded Document (Static Master)</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Preferences</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="alert error">Create a candidate profile before adding preferences.</div>
+    {% endif %}
+</section>
+
+{% include 'core/includes/readiness_checklist.html' %}
+{% endblock %}
