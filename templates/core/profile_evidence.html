@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile Evidence | AI Career Agent{% endblock %}
+{% block page_title %}Profile Evidence{% endblock %}
+
+{% block content %}
+{% if profile %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>{{ profile.name|default:"Candidate" }}</h2>
+            <p>Evidence sources and claims used by scoring, application kits, and claim validation.</p>
+        </div>
+        <a href="{% url 'profile_review' %}" class="btn btn-primary">Review Claims</a>
+    </div>
+
+    <div class="skills-breakdown">
+        <div class="skill-category">
+            <h4>Skills</h4>
+            <ul class="skill-tags match">
+                {% for skill in profile.skills %}
+                <li>{{ skill }}</li>
+                {% empty %}
+                <li>No skills saved</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="skill-category">
+            <h4>Evidence Notes</h4>
+            <ul class="risk-list">
+                {% for note in profile.evidence_notes %}
+                <li>{{ note }}</li>
+                {% empty %}
+                <li>No evidence notes extracted yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Evidence Sources</h3>
+    </div>
+    <div class="skills-breakdown">
+        <div class="skill-category">
+            <h4>Documents</h4>
+            <ul class="risk-list">
+                {% for document in documents %}
+                <li>{{ document.get_document_type_display }}: {{ document.original_filename }} ({{ document.get_status_display }})</li>
+                {% empty %}
+                <li>No documents uploaded yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="skill-category">
+            <h4>Links</h4>
+            <ul class="risk-list">
+                {% for link in links %}
+                <li>{{ link.get_link_type_display }}: {{ link.url }}</li>
+                {% empty %}
+                <li>No links saved yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Claims</h3>
+    </div>
+    <ul class="risk-list">
+        {% for claim in claims %}
+        <li>{{ claim.get_category_display }}: {{ claim.value }} - {{ claim.get_status_display }}</li>
+        {% empty %}
+        <li>No claims extracted yet.</li>
+        {% endfor %}
+    </ul>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Profile JSON</h3>
+    </div>
+    <pre class="json-viewer">{{ profile_json }}</pre>
+</section>
+{% else %}
+<section class="panel warning-panel">
+    <div class="panel-header">
+        <div>
+            <h2>No profile saved</h2>
+            <p>Create a candidate profile before reviewing evidence.</p>
+        </div>
+        <a href="{% url 'profile_setup' %}" class="btn btn-primary">Open Profile</a>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
