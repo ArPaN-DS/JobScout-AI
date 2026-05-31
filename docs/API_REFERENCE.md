@@ -594,19 +594,19 @@ class MatchResult(BaseModel):
 ### URL Routes (`core/urls.py`)
 
 ```
-/                           → Home dashboard
-/profile/                   → Candidate profile management
-/profile/upload/            → Upload resume
-/profile/<id>/             → View/edit profile
-/jobs/                     → Browse jobs
-/jobs/<id>/                → Job details
-/jobs/<id>/score/          → Score job match
-/jobs/<id>/apply/          → Generate application
-/applications/             → View applications
-/applications/<id>/        → Review application
-/settings/providers/       → Configure LLM providers
-/settings/channels/        → Configure Telegram/Discord
-/admin/                    → Django admin panel
+/                           ' Home dashboard
+/profile/                   ' Candidate profile management
+/profile/upload/            ' Upload resume
+/profile/<id>/             ' View/edit profile
+/jobs/                     ' Browse jobs
+/jobs/<id>/                ' Job details
+/jobs/<id>/score/          ' Score job match
+/jobs/<id>/apply/          ' Generate application
+/applications/             ' View applications
+/applications/<id>/        ' Review application
+/settings/providers/       ' Configure LLM providers
+/settings/channels/        ' Configure Telegram/Discord
+/admin/                    ' Django admin panel
 ```
 
 ### API Endpoints (JSON)
