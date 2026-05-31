@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile Links | AI Career Agent{% endblock %}
+{% block page_title %}Profile Links{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Candidate Links</h2>
+            <p>Add user-owned public links that help ground the candidate profile.</p>
+        </div>
+    </div>
+
+    {% if candidate %}
+    <form method="post" class="modern-form">
+        {% csrf_token %}
+        <div class="form-grid">
+            <div class="input-field">
+                <label for="linkedin_url">LinkedIn URL</label>
+                <input type="url" id="linkedin_url" name="linkedin_url" value="{{ candidate.linkedin_url }}">
+            </div>
+            <div class="input-field">
+                <label for="github_url">GitHub URL</label>
+                <input type="url" id="github_url" name="github_url" value="{{ candidate.github_url }}">
+            </div>
+            <div class="input-field">
+                <label for="portfolio_url">Portfolio URL</label>
+                <input type="url" id="portfolio_url" name="portfolio_url" value="{{ candidate.portfolio_url }}">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Links</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="alert error">Create a candidate profile before adding links.</div>
+    {% endif %}
+</section>
+{% endblock %}
