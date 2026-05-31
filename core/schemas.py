@@ -229,6 +229,19 @@ class ApplicationKit(BaseModel):
         return clean_list(value)
 
 
+class KitCriticVerdict(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    approved: bool = False
+    issues: list[str] = Field(default_factory=list)
+    unsupported_claims: list[str] = Field(default_factory=list)
+
+    @field_validator("issues", "unsupported_claims", mode="before")
+    @classmethod
+    def _clean_lists(cls, value: Any) -> list[str]:
+        return clean_list(value)
+
+
 class BaseJobExtraction(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
