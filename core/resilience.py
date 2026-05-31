@@ -14,15 +14,15 @@ from .logging_utils import get_logger
 
 logger = get_logger(__name__)
 
-# ─────────────────────────────────────────────
+# 
 # ERROR CLASSIFICATION
-# ─────────────────────────────────────────────
+# 
 
 class ErrorType(Enum):
-    TRANSIENT = "transient"          # Timeout, 503 → retry
-    AUTH_REQUIRED = "auth_required"  # Login wall, 401 → try auto-login
-    BOT_BLOCKED = "bot_blocked"     # CAPTCHA, Cloudflare → screenshot + skip
-    PERMANENT = "permanent"         # 404, structure changed → log + skip
+    TRANSIENT = "transient"          # Timeout, 503  retry
+    AUTH_REQUIRED = "auth_required"  # Login wall, 401  try auto-login
+    BOT_BLOCKED = "bot_blocked"     # CAPTCHA, Cloudflare  screenshot + skip
+    PERMANENT = "permanent"         # 404, structure changed  log + skip
     UNKNOWN = "unknown"
 
 
@@ -61,9 +61,9 @@ def classify_error(error: Exception = None, status_code: int = None, page_conten
     return ErrorType.UNKNOWN
 
 
-# ─────────────────────────────────────────────
+# 
 # EXPONENTIAL BACKOFF RETRY
-# ─────────────────────────────────────────────
+# 
 
 async def retry_with_backoff(
     func: Callable,
@@ -105,9 +105,9 @@ async def retry_with_backoff(
     raise last_exception
 
 
-# ─────────────────────────────────────────────
+# 
 # CIRCUIT BREAKER
-# ─────────────────────────────────────────────
+# 
 
 @dataclass
 class CircuitState:
@@ -184,9 +184,9 @@ class CircuitBreaker:
 circuit_breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=300)
 
 
-# ─────────────────────────────────────────────
+# 
 # SCREENSHOT ON FAILURE
-# ─────────────────────────────────────────────
+# 
 
 async def screenshot_on_failure(page, portal: str, reason: str = "") -> Optional[str]:
     """Capture a page screenshot and save it to the Django media folder."""
