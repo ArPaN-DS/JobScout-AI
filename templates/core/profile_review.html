@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Review Claims | AI Career Agent{% endblock %}
+{% block page_title %}Review Claims{% endblock %}
+
+{% block content %}
+{% if candidate %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>{{ candidate.full_name|default:"Candidate" }}</h2>
+            <p>Confirm evidence-backed facts before the agent uses them in applications.</p>
+        </div>
+        <span class="status-pill neutral">{{ candidate.get_status_display }}</span>
+    </div>
+
+    <form method="post" class="modern-form">
+        {% csrf_token %}
+        <div class="skills-breakdown">
+            {% for claim in claims %}
+            <label class="claim-row">
+                <input type="checkbox" name="claim_ids" value="{{ claim.id }}">
+                <span>
+                    <strong>{{ claim.get_category_display }}</strong>
+                    {{ claim.value }}
+                    <small>{{ claim.get_status_display }}{% if claim.source %} from {{ claim.source.label }}{% endif %}</small>
+                </span>
+            </label>
+            {% empty %}
+            <p>No claims are waiting for review.</p>
+            {% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" name="action" value="confirm_selected" class="btn btn-primary">Confirm Selected</button>
+            <button type="submit" name="action" value="reject_selected" class="btn btn-secondary">Reject Selected</button>
+            <button type="submit" name="action" value="confirm_all" class="btn btn-success">Confirm All</button>
+        </div>
+    </form>
+</section>
+{% else %}
+<section class="panel warning-panel">
+    <div class="panel-header">
+        <div>
+            <h2>No candidate profile</h2>
+            <p>Create a candidate profile before reviewing claims.</p>
+        </div>
+        <a href="{% url 'profile_setup' %}" class="btn btn-primary">Open Profile</a>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
