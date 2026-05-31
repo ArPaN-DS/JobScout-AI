@@ -1,0 +1,33 @@
+{% if readiness %}
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <div>
+            <h3>Profile readiness</h3>
+            <p>
+                {% if readiness.ready %}
+                Ready for kit generation and bulk prep.
+                {% else %}
+                Complete these items before generating application kits.
+                {% endif %}
+            </p>
+        </div>
+        <span class="status-pill {% if readiness.ready %}ok{% else %}warn{% endif %}">
+            {% if readiness.ready %}Ready{% else %}Incomplete{% endif %}
+        </span>
+    </div>
+    <ul class="checklist">
+        {% for item in readiness.items %}
+        <li class="{% if item.complete %}done{% else %}pending{% endif %}">
+            <span>{{ item.label }}</span>
+            {% if item.detail %}<small>{{ item.detail }}</small>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% if match_thresholds %}
+    <p class="muted mt-4">
+        Match bar: score  {{ match_thresholds.min_match_score }} and confidence  {{ match_thresholds.min_match_confidence }}.
+        <a href="{% url 'onboarding_preferences' %}">Adjust in preferences</a>.
+    </p>
+    {% endif %}
+</section>
+{% endif %}
