@@ -15,9 +15,9 @@ from django.conf import settings
 from .models import Application, JobLead, JobSourceRun, CandidatePreference
 from .resilience import circuit_breaker
 
-# ─────────────────────────────────────────────
+# 
 # SEARCH QUERIES DEFAULT FALLBACK
-# ─────────────────────────────────────────────
+# 
 
 DEFAULT_SEARCH_QUERIES = [
     "NLP Engineer",
@@ -134,12 +134,12 @@ class JobSourceConnector:
         return source_run
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: JOBSPY (LinkedIn, Indeed, Glassdoor, Google Jobs)
-# ─────────────────────────────────────────────
+# 
 
 def search_jobspy(query: str, hours_old: int = 24, sites: list = None) -> list[dict]:
-    """Search via jobspy — LinkedIn, Indeed, Glassdoor, Google Jobs."""
+    """Search via jobspy  LinkedIn, Indeed, Glassdoor, Google Jobs."""
     if not circuit_breaker.is_available("jobspy"):
         return []
 
@@ -171,14 +171,14 @@ def search_jobspy(query: str, hours_old: int = 24, sites: list = None) -> list[d
         circuit_breaker.record_success("jobspy")
     except Exception as e:
         circuit_breaker.record_failure("jobspy", str(e))
-        print(f"  ⚠️ jobspy error for '{query}': {e}")
+        print(f"   jobspy error for '{query}': {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: NAUKRI (Scrapling-capable)
-# ─────────────────────────────────────────────
+# 
 
 def search_naukri(query: str) -> list[dict]:
     """Search Naukri.com using Scrapling Fetcher."""
@@ -229,14 +229,14 @@ def search_naukri(query: str) -> list[dict]:
         circuit_breaker.record_success("naukri")
     except Exception as e:
         circuit_breaker.record_failure("naukri", str(e))
-        print(f"  ⚠️ Naukri error: {e}")
+        print(f"   Naukri error: {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: INTERNSHALA (Scrapling-capable)
-# ─────────────────────────────────────────────
+# 
 
 def search_internshala(query: str) -> list[dict]:
     """Search Internshala using Scrapling Fetcher."""
@@ -281,14 +281,14 @@ def search_internshala(query: str) -> list[dict]:
         circuit_breaker.record_success("internshala")
     except Exception as e:
         circuit_breaker.record_failure("internshala", str(e))
-        print(f"  ⚠️ Internshala error: {e}")
+        print(f"   Internshala error: {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: FOUNDIT
-# ─────────────────────────────────────────────
+# 
 
 def search_foundit(query: str) -> list[dict]:
     """Search Foundit.in (Monster India)."""
@@ -331,14 +331,14 @@ def search_foundit(query: str) -> list[dict]:
         circuit_breaker.record_success("foundit")
     except Exception as e:
         circuit_breaker.record_failure("foundit", str(e))
-        print(f"  ⚠️ Foundit error: {e}")
+        print(f"   Foundit error: {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: WELLFOUND
-# ─────────────────────────────────────────────
+# 
 
 def search_wellfound(query: str) -> list[dict]:
     """Search Wellfound (AngelList) startup jobs."""
@@ -368,17 +368,17 @@ def search_wellfound(query: str) -> list[dict]:
         circuit_breaker.record_success("wellfound")
     except Exception as e:
         circuit_breaker.record_failure("wellfound", str(e))
-        print(f"  ⚠️ Wellfound error: {e}")
+        print(f"   Wellfound error: {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: REMOTEOK
-# ─────────────────────────────────────────────
+# 
 
 async def search_remoteok(client: httpx.AsyncClient) -> list[dict]:
-    """Search RemoteOK.com — free JSON API for remote jobs."""
+    """Search RemoteOK.com  free JSON API for remote jobs."""
     if not circuit_breaker.is_available("remoteok"):
         return []
 
@@ -409,14 +409,14 @@ async def search_remoteok(client: httpx.AsyncClient) -> list[dict]:
         circuit_breaker.record_success("remoteok")
     except Exception as e:
         circuit_breaker.record_failure("remoteok", str(e))
-        print(f"  ⚠️ RemoteOK error: {e}")
+        print(f"   RemoteOK error: {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: HIRIST (Scrapling-capable)
-# ─────────────────────────────────────────────
+# 
 
 def search_hirist(query: str) -> list[dict]:
     """Search Hirist.tech using Scrapling Fetcher."""
@@ -463,14 +463,14 @@ def search_hirist(query: str) -> list[dict]:
         circuit_breaker.record_success("hirist")
     except Exception as e:
         circuit_breaker.record_failure("hirist", str(e))
-        print(f"  ⚠️ Hirist error: {e}")
+        print(f"   Hirist error: {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 1: Y COMBINATOR
-# ─────────────────────────────────────────────
+# 
 
 async def search_yc_jobs(client: httpx.AsyncClient) -> list[dict]:
     """Search Y Combinator's Work at a Startup board."""
@@ -515,14 +515,14 @@ async def search_yc_jobs(client: httpx.AsyncClient) -> list[dict]:
         circuit_breaker.record_success("ycombinator")
     except Exception as e:
         circuit_breaker.record_failure("ycombinator", str(e))
-        print(f"  ⚠️ Y Combinator error: {e}")
+        print(f"   Y Combinator error: {e}")
 
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 2: GREENHOUSE BOARDS
-# ─────────────────────────────────────────────
+# 
 
 GREENHOUSE_COMPANIES = [
     "openai", "anthropic", "huggingface", "databricks",
@@ -586,9 +586,9 @@ async def search_greenhouse_boards(client: httpx.AsyncClient) -> list[dict]:
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 2: LEVER BOARDS
-# ─────────────────────────────────────────────
+# 
 
 LEVER_COMPANIES = [
     "netflix", "coinbase", "anduril", "scale",
@@ -648,9 +648,9 @@ async def search_lever_boards(client: httpx.AsyncClient) -> list[dict]:
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # TIER 3: COMPANY CAREER PAGES
-# ─────────────────────────────────────────────
+# 
 
 COMPANY_CAREER_PAGES = [
     {"name": "Sarvam AI",         "url": "https://www.sarvam.ai/careers"},
@@ -697,7 +697,7 @@ COMPANY_CAREER_PAGES = [
 
 
 async def search_career_pages(client: httpx.AsyncClient) -> list[dict]:
-    """Scrape company career pages — best effort extraction."""
+    """Scrape company career pages  best effort extraction."""
     if not circuit_breaker.is_available("career_pages"):
         return []
 
@@ -754,9 +754,9 @@ async def search_career_pages(client: httpx.AsyncClient) -> list[dict]:
     return jobs
 
 
-# ─────────────────────────────────────────────
+# 
 # ENHANCED DEDUPLICATION
-# ─────────────────────────────────────────────
+# 
 
 def deduplicate_jobs(jobs: list[dict]) -> list[dict]:
     """Normalize URLs and fuzzy match on normalized title + company."""
@@ -789,9 +789,9 @@ def deduplicate_jobs(jobs: list[dict]) -> list[dict]:
     return unique
 
 
-# ─────────────────────────────────────────────
+# 
 # MASTER PARALLEL SCRAPER ORCHESTRATOR
-# ─────────────────────────────────────────────
+# 
 
 async def collect_all_jobs(hours_old: int = 24) -> tuple[list[dict], dict]:
     """Collect jobs from ALL sources in parallel, using active CandidatePreferences if available."""
@@ -800,7 +800,7 @@ async def collect_all_jobs(hours_old: int = 24) -> tuple[list[dict], dict]:
     if pref and pref.generated_queries:
         search_queries = pref.generated_queries
 
-    print(f"\n📡 Collecting jobs using {len(search_queries)} queries...")
+    print(f"\n Collecting jobs using {len(search_queries)} queries...")
     all_jobs = []
     source_stats = {}
 
@@ -834,7 +834,7 @@ async def collect_all_jobs(hours_old: int = 24) -> tuple[list[dict], dict]:
                     all_jobs.extend(result)
                     source_stats[source] = source_stats.get(source, 0) + len(result)
             except Exception as e:
-                print(f"     ✗ {source}/{query}: {e}")
+                print(f"     - {source}/{query}: {e}")
             await asyncio.sleep(random.uniform(0.1, 0.4))
 
         # Process async tasks
@@ -845,7 +845,7 @@ async def collect_all_jobs(hours_old: int = 24) -> tuple[list[dict], dict]:
                     all_jobs.extend(result)
                     source_stats[source] = source_stats.get(source, 0) + len(result)
             except Exception as e:
-                print(f"     ✗ {source}: {e}")
+                print(f"     - {source}: {e}")
 
     all_jobs = deduplicate_jobs(all_jobs)
     source_stats["_total_raw"] = sum(source_stats.values())
@@ -854,9 +854,9 @@ async def collect_all_jobs(hours_old: int = 24) -> tuple[list[dict], dict]:
     return all_jobs, source_stats
 
 
-# ─────────────────────────────────────────────
+# 
 # UNIFIED MEGA CONNECTOR
-# ─────────────────────────────────────────────
+# 
 
 class MegaJobSourceConnector(JobSourceConnector):
     source_type = "mega"
