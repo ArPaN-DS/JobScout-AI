@@ -13,7 +13,7 @@ We welcome contributions from the community! Job_bro_AI is designed to be extens
 
 ## Ways to Contribute
 
-### 1. Report Bugs 🐛
+### 1. Report Bugs
 
 If you find a bug, please open an issue with:
 - **Clear title**: Describe the problem in 1 sentence
@@ -55,7 +55,7 @@ error message here
 (if applicable)
 ```
 
-### 2. Request Features ✨
+### 2. Request Features
 
 **Issue Template:**
 ```markdown
@@ -77,7 +77,7 @@ Other approaches?
 Any other info?
 ```
 
-### 3. Improve Documentation 📚
+### 3. Improve Documentation "
 
 Documentation is just as important as code!
 
@@ -86,7 +86,7 @@ Documentation is just as important as code!
 - Improve diagrams
 - Translate documentation
 
-### 4. Fix Bugs or Add Features 💻
+### 4. Fix Bugs or Add Features '
 
 This is our primary contribution path.
 
@@ -479,7 +479,7 @@ class LinkedInJobSource(BaseJobSource):
 
 - **GitHub Issues**: For bugs and features
 - **GitHub Discussions**: For questions
-- **Email**: arpanmajumdar952@gmail.com (maintainer)
+- **Security reports**: Use a private maintainer channel or GitHub security advisory when available.
 
 ---
 
@@ -496,4 +496,4 @@ We recognize all contributors! Your name and contributions will be celebrated in
 - CONTRIBUTORS.md file
 - Release notes
 
-Thank you for contributing to Job_bro_AI! 🙌
+Thank you for contributing to Job_bro_AI! 
