@@ -79,9 +79,9 @@ DJANGO_SECRET_KEY=your-very-long-random-secret-key-here-at-least-50-chars
 # At least ONE LLM provider key (choose one or more)
 GEMINI_API_KEY=your_gemini_key_here
 # OR
-# OPENAI_API_KEY=sk-proj-...
+# OPENAI_API_KEY=replace-with-openai-key
 # OR
-# ANTHROPIC_API_KEY=sk-ant-...
+# ANTHROPIC_API_KEY=replace-with-anthropic-key
 ```
 
 #### Get API Keys
@@ -198,7 +198,7 @@ python manage.py check --deploy
 
 1. Go to `http://localhost:8000/provider-settings`
 2. You should see available LLM providers
-3. Green checkmark ✓ = Key is valid
+3. Green checkmark " = Key is valid
 4. Red X = Key not configured or invalid
 
 ---
@@ -397,10 +397,9 @@ See [USER_GUIDE.md](USER_GUIDE.md) for detailed usage instructions.
 
 ## Getting Help
 
-- 📖 [Documentation](../docs/)
-- 🐛 [Report Issues](https://github.com/ArPaN-DS/Job_bro_AI/issues)
-- 💬 [Discussions](https://github.com/ArPaN-DS/Job_bro_AI/discussions)
-- 📧 Email: arpanmajumdar952@gmail.com
+- [Documentation](../docs/)
+- [Report Issues](https://github.com/ArPaN-DS/Job_bro_AI/issues)
+- [Discussions](https://github.com/ArPaN-DS/Job_bro_AI/discussions)
 
 ---
 
@@ -498,8 +497,8 @@ ANTHROPIC_API_KEY=key3
 | DJANGO_DEBUG | Yes | true | false in production |
 | DJANGO_SECRET_KEY | Yes | random50char | Use strong key |
 | GEMINI_API_KEY | No | ai-xxxxx | Free tier available |
-| OPENAI_API_KEY | No | sk-proj-xxx | Pay-as-you-go |
-| ANTHROPIC_API_KEY | No | sk-ant-xxx | Pay-as-you-go |
+| OPENAI_API_KEY | No | replace-with-openai-key | Pay-as-you-go |
+| ANTHROPIC_API_KEY | No | replace-with-anthropic-key | Pay-as-you-go |
 | TELEGRAM_BOT_TOKEN | No | 123456:ABC... | Optional |
 | DISCORD_BOT_TOKEN | No | MTk4NjIyNDgzMjU4... | Optional |
 | OLLAMA_ENABLED | No | false | Set true if local LLM |
@@ -508,6 +507,6 @@ ANTHROPIC_API_KEY=key3
 
 ---
 
-**Installation Complete!** 🎉
+**Installation Complete!** 
 
 You're now ready to use Job_bro_AI. Start with uploading your resume and explore the features.
