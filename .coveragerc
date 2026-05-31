@@ -1,0 +1,16 @@
+[run]
+source = core
+omit =
+    */migrations/*
+    core/tests*.py
+    core/auto_applier.py
+    core/resume_tailor.py
+    core/channels.py
+
+[report]
+precision = 1
+show_missing = True
+skip_empty = True
+
+[html]
+directory = htmlcov
