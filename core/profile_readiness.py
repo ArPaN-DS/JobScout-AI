@@ -89,5 +89,5 @@ def assert_ready_for_kit_generation(candidate: CandidateProfile | None) -> None:
         return
     raise ValueError(
         "Profile is not ready for kit generation. Complete: " + "; ".join(readiness.blockers[:4])
-        + ("." if len(readiness.blockers) <= 4 else "; …")
+        + ("." if len(readiness.blockers) <= 4 else "; ")
     )
