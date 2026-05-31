@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}Metrics | AI Career Agent{% endblock %}
+{% block page_title %}Metrics &amp; Budget{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>LLM budget (24h)</h2>
+            <p>Local spend estimate from recorded provider calls.</p>
+        </div>
+        <span class="status-pill {% if budget.over_budget %}warn{% else %}ok{% endif %}">
+            ${{ budget.spent_usd }} / ${{ budget.daily_limit_usd }}
+        </span>
+    </div>
+    <p class="muted">Remaining today: <strong>${{ budget.remaining_usd }}</strong>
+        {% if budget.warning %}  approaching daily limit{% endif %}
+    </p>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Funnel (last {{ funnel.period_days }} days)</h3>
+    </div>
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <span class="metric-value">{{ funnel.conversion.ingested }}</span>
+            <span class="metric-label">Leads ingested</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-value">{{ funnel.conversion.scored }}</span>
+            <span class="metric-label">Scored ({{ funnel.conversion.score_rate }}%)</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-value">{{ funnel.conversion.matched }}</span>
+            <span class="metric-label">Matched ({{ funnel.conversion.match_rate }}%)</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-value">{{ funnel.conversion.kits }}</span>
+            <span class="metric-label">Kits ({{ funnel.conversion.kit_rate }}%)</span>
+        </div>
+        <div class="metric-card">
+            <span class="metric-value">{{ funnel.conversion.submitted }}</span>
+            <span class="metric-label">Submitted ({{ funnel.conversion.submit_rate }}%)</span>
+        </div>
+    </div>
+    <p class="muted mt-4">
+        Discovery runs (7d): {{ funnel.discovery_runs_7d }} 
+        Failed apps (7d): {{ funnel.failed_applications_7d }} 
+        LLM events (24h): {{ funnel.llm_events_24h }}
+    </p>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Recent pipeline jobs</h3>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Kind</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                    <th>Message</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in pipeline_jobs %}
+                <tr>
+                    <td>{{ job.kind }}</td>
+                    <td>{{ job.status }}</td>
+                    <td>{{ job.progress_current }}/{{ job.progress_total }}</td>
+                    <td>{{ job.message|default:"" }}</td>
+                    <td>
+                        {% if job.status == 'running' %}
+                        <form method="post" action="{% url 'cancel_pipeline_job' job.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-secondary btn-sm">Cancel</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No pipeline jobs yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
