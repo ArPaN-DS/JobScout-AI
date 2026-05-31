@@ -40,7 +40,7 @@ def format_profile_as_markdown(profile: MasterProfile) -> str:
         
     md.append("\n## PROFESSIONAL EXPERIENCE")
     for exp in profile.experience:
-        md.append(f"### {exp.role} — {exp.company} ({exp.duration})")
+        md.append(f"### {exp.role}  {exp.company} ({exp.duration})")
         for hl in exp.highlights:
             md.append(f"- {hl}")
             
@@ -103,7 +103,7 @@ INSTRUCTIONS:
         )
         tailored_markdown = result.text.strip()
     except Exception as e:
-        print(f"  ⚠️ LLM tailoring failed: {e}. Falling back to default profile...")
+        print(f"   LLM tailoring failed: {e}. Falling back to default profile...")
         tailored_markdown = master_resume_md
 
     # Clean up formatting wrappers
