@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Auto Queue | AI Career Agent{% endblock %}
+{% block page_title %}Auto Queue{% endblock %}
+
+{% block content %}
+{% include 'core/includes/readiness_checklist.html' %}
+
+<section class="panel" id="discovery-panel">
+    <div class="panel-header">
+        <div>
+            <h2>Daily discovery</h2>
+            <p>
+                Tier A: JobSpy &amp; RemoteOK. Tier B: India boards &amp; career pages.
+                Freshness window: {{ discovery_config.hours_old }}h.
+            </p>
+        </div>
+        <div class="form-actions" style="margin:0;">
+            <button type="button" class="btn btn-primary" id="btn-run-discovery">Run discovery</button>
+            <button type="button" class="btn btn-secondary" id="btn-refresh-status">Refresh status</button>
+        </div>
+    </div>
+    <p id="discovery-status-line" class="muted">Queue: {{ queue_stats.total|default:0 }} leads 
+        {{ queue_stats.matched|default:0 }} matched, {{ new_leads_count }} new to score.</p>
+    <div id="pipeline-progress"></div>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Source health</h3>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table" id="source-health-table">
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Tier</th>
+                    <th>Status</th>
+                    <th>Cooldown</th>
+                    <th>Last run</th>
+                    <th>Imported</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in source_health %}
+                <tr>
+                    <td>{{ source.label }}</td>
+                    <td>{{ source.tier }}</td>
+                    <td>
+                        {% if source.available %}
+                        <span class="status-pill ok">Available</span>
+                        {% else %}
+                        <span class="status-pill warn">Paused</span>
+                        {% endif %}
+                    </td>
+                    <td>{% if source.cooldown_remaining_seconds %}{{ source.cooldown_remaining_seconds }}s{% else %}{% endif %}</td>
+                    <td>{{ source.last_run_status|default:"" }}</td>
+                    <td>{{ source.last_imported }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header">
+        <div>
+            <h3>Bulk actions</h3>
+            <p>Score new leads or generate kits for top matches. Estimates are approximate.</p>
+        </div>
+    </div>
+    <div class="form-grid">
+        <form method="post" action="{% url 'bulk_score_leads' %}" class="bulk-form" data-preview-cost="{{ score_cost_preview.total_usd }}">
+            {% csrf_token %}
+            <input type="hidden" name="limit" value="20">
+            <p>Score up to 20 new leads (~${{ score_cost_preview.total_usd }} USD)</p>
+            <button type="submit" class="btn btn-primary">Score all new</button>
+        </form>
+        <form method="post" action="{% url 'bulk_generate_kits' %}" class="bulk-form" data-preview-cost="{{ kit_cost_preview.total_usd }}">
+            {% csrf_token %}
+            <input type="hidden" name="top_n" value="3">
+            <p>Generate kits for top 3 matches (~${{ kit_cost_preview.total_usd }} USD)</p>
+            <button type="submit" class="btn btn-secondary" {% if not readiness.ready %}disabled title="Complete profile readiness first"{% endif %}>
+                Generate top kits
+            </button>
+        </form>
+    </div>
+    <div id="bulk-result" class="alert" style="display:none; margin-top:12px;"></div>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Filter leads</h3>
+        <nav class="filter-tabs">
+            <a href="?status=matched" class="{% if status_filter == 'matched' %}active{% endif %}">Matched</a>
+            <a href="?status=new" class="{% if status_filter == 'new' %}active{% endif %}">New</a>
+            <a href="?status=low_match" class="{% if status_filter == 'low_match' %}active{% endif %}">Low match</a>
+            <a href="?status=all" class="{% if status_filter == 'all' %}active{% endif %}">All</a>
+        </nav>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Import Job Lead</h2>
+            <p>Manual import (Tier B): paste URL or description from any board.</p>
+        </div>
+    </div>
+
+    <form class="modern-form" method="post" action="{% url 'import_job' %}">
+        {% csrf_token %}
+        <div class="form-grid">
+            <div class="input-field">
+                <label for="title">Title</label>
+                <input id="title" name="title" placeholder="AI Engineer">
+            </div>
+            <div class="input-field">
+                <label for="company">Company</label>
+                <input id="company" name="company" placeholder="Company name">
+            </div>
+            <div class="input-field">
+                <label for="location">Location</label>
+                <input id="location" name="location" placeholder="Remote">
+            </div>
+            <div class="input-field">
+                <label for="job_url">Job URL</label>
+                <input id="job_url" name="job_url" type="url" placeholder="https://company.com/jobs/123">
+            </div>
+        </div>
+        <div class="input-field">
+            <label for="job_description">Job Description</label>
+            <textarea id="job_description" name="job_description" rows="8" required></textarea>
+        </div>
+        <label class="checkbox-row">
+            <input type="checkbox" name="score_now" {% if not has_profile %}disabled{% endif %}>
+            Score immediately
+        </label>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Import Lead</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Leads ({{ status_filter }})</h3>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table" id="leads-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Score</th>
+                    <th>Role</th>
+                    <th>Company</th>
+                    <th>Match summary</th>
+                    <th>Source</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lead in leads %}
+                <tr>
+                    <td>{{ lead.get_status_display }}</td>
+                    <td>
+                        {% if lead.match_score != None %}
+                        {{ lead.match_score }}%
+                        {% with match=lead.ai_metadata.match %}
+                        {% if match.confidence %}<small>(conf {{ match.confidence }})</small>{% endif %}
+                        {% endwith %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ lead.title|default:"Untitled" }}</td>
+                    <td>{{ lead.company|default:"Unknown" }}</td>
+                    <td>{{ lead.match_summary|truncatechars:80 }}</td>
+                    <td>{{ lead.source_name|default:lead.source_type }}</td>
+                    <td>
+                        {% if lead.status == 'matched' %}
+                        <a href="{% url 'applications_dashboard' %}" class="btn btn-secondary btn-sm">Applications</a>
+                        {% endif %}
+                        <form method="post" action="{% url 'dismiss_lead' %}" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                            <button type="submit" class="btn btn-secondary btn-sm">Not relevant</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">No leads in this filter. Run discovery or import a job.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/queue.js' %}"></script>
+{% endblock %}
