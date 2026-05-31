@@ -4,3 +4,12 @@ pdfplumber
 pypdf2
 pydantic
 python-dotenv
+django-q2
+python-docx
+python-jobspy
+scrapling
+markdown2
+beautifulsoup4
+requests
+playwright
+playwright-stealth
