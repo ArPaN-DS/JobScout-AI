@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Channel Settings | AI Career Agent{% endblock %}
+{% block page_title %}Channel Settings{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Interaction Channels</h2>
+            <p>Telegram and Discord commands are locked behind allowlists before they can control the agent.</p>
+        </div>
+    </div>
+
+    <div class="status-grid">
+        <div class="status-card">
+            <span class="eyebrow">Telegram</span>
+            {% if telegram_enabled %}
+            <span class="status-pill success">Allowlist set</span>
+            {% else %}
+            <span class="status-pill neutral">Disabled</span>
+            {% endif %}
+            <p>Webhook path: /integrations/telegram/webhook/</p>
+        </div>
+        <div class="status-card">
+            <span class="eyebrow">Discord</span>
+            {% if discord_enabled %}
+            <span class="status-pill success">Allowlist set</span>
+            {% else %}
+            <span class="status-pill neutral">Disabled</span>
+            {% endif %}
+            <p>Interactions path: /integrations/discord/interactions/</p>
+        </div>
+        <div class="status-card">
+            <span class="eyebrow">Auto Submit</span>
+            {% if auto_submit_enabled %}
+            <span class="status-pill success" style="background:#e8f7ef; color:#16835f;">Enabled (Autonomous)</span>
+            {% else %}
+            <span class="status-pill neutral" style="background:#eef2f7; color:#475569;">Safety Mode (Review-first)</span>
+            {% endif %}
+            <p>Form filling occurs autonomously; click submit manually or toggle auto-submit.</p>
+            {% if candidate %}
+            <form method="post" style="margin-top: 15px;">
+                {% csrf_token %}
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <label for="auto_submit_enabled" class="checkbox-row" style="margin: 0; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="auto_submit_enabled" name="auto_submit_enabled" {% if auto_submit_enabled %}checked{% endif %} style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 600; font-size: 0.9rem; color: var(--ink);">Autonomous Submit</span>
+                    </label>
+                    <button type="submit" class="btn btn-secondary btn-sm" style="min-height: 32px; padding: 4px 12px; font-size: 0.85rem; font-weight: 700;">Save</button>
+                </div>
+            </form>
+            {% else %}
+            <p style="color: var(--danger); font-size: 0.85rem; margin-top: 10px;">Create a candidate profile to configure.</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}
