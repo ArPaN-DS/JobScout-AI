@@ -51,7 +51,7 @@ def start_job(
         status=PipelineJob.Status.RUNNING,
         progress_total=max(0, progress_total),
         progress_current=0,
-        message="Starting…",
+        message="Starting",
         metadata=metadata or {},
         started_at=timezone.now(),
     )
