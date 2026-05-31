@@ -1,85 +1,63 @@
-import requests
 import json
-import time
+import os
 
-BASE_URL = "http://127.0.0.1:8000"
-RESUME_PATH = r"C:\Users\arpan\Downloads\Arpan_Majumdar.pdf"
+import requests
+
+
+BASE_URL = os.getenv("E2E_BASE_URL", "http://127.0.0.1:8000")
+RESUME_PATH = os.getenv("E2E_RESUME_PATH", "")
+
 
 def run_test():
-    session = requests.Session()
-    
-    print("--- 1. Testing Profile Setup ---")
-    response = session.get(f"{BASE_URL}/")
-    csrf_token = session.cookies.get('csrftoken')
-    headers = {"X-CSRFToken": csrf_token, "Referer": f"{BASE_URL}/"}
-    
-    try:
-        with open(RESUME_PATH, "rb") as f:
-            files = {"resume": f}
-            data = {"linkedin_url": "www.linkedin.com/in/arpan-majumdar-", "github_url": ""}
-            print("Sending POST request to upload resume (this may take a few seconds)...")
-            response = session.post(f"{BASE_URL}/", files=files, data=data, headers=headers)
-            
-            if response.status_code == 200:
-                print("✅ Profile Setup Success!")
-                print("Profile Data:", json.dumps(response.json().get('data', {}), indent=2)[:500] + "...\n")
-            else:
-                print("❌ Profile Setup Failed:", response.status_code, response.text)
-                return
-    except FileNotFoundError:
-        print(f"❌ Error: Could not find resume at {RESUME_PATH}")
-        return
+    if not RESUME_PATH:
+        raise SystemExit("Set E2E_RESUME_PATH to a local PDF or DOCX before running this script.")
 
-    print("--- 2. Testing Job Discovery & Matching ---")
-    
-    mock_jd = """
-    We are looking for a Software Engineer with experience in Python, Django, HTML, CSS, and Javascript.
-    Experience with Machine Learning and AI models like LLMs is a huge plus.
-    You will be building responsive web applications and integrating them with AI backends.
-    Requires strong communication skills and ability to work in a fast-paced environment.
+    session = requests.Session()
+
+    response = session.get(f"{BASE_URL}/")
+    csrf_token = session.cookies.get("csrftoken")
+    headers = {"X-CSRFToken": csrf_token or "", "Referer": f"{BASE_URL}/"}
+
+    with open(RESUME_PATH, "rb") as handle:
+        response = session.post(
+            f"{BASE_URL}/",
+            files={"resume": handle},
+            data={
+                "linkedin_url": "https://linkedin.com/in/sample-candidate",
+                "github_url": "https://github.com/sample-candidate",
+                "target_roles": "Backend Developer, Data Engineer",
+                "locations": "Remote",
+            },
+            headers=headers,
+        )
+
+    if response.status_code != 200:
+        raise SystemExit(f"Profile setup failed: {response.status_code} {response.text}")
+    print("Profile setup OK")
+    print(json.dumps(response.json().get("data", {}), indent=2)[:800])
+
+    job_description = """
+    We are hiring a backend developer to build Python services, Django APIs,
+    data workflows, tests, and production integrations. The role requires
+    clear communication, product judgment, and collaboration with engineering
+    and operations teams.
     """
-    
-    data = {
-        "job_url": "https://example.com/job",
-        "job_description": mock_jd
-    }
-    
-    print("Sending POST request to match job...")
-    response = session.post(f"{BASE_URL}/jobs/", data=data, headers=headers)
-    
-    if response.status_code == 200:
-        res_json = response.json()
-        print("✅ Job Match Success!")
-        print(f"Score: {res_json['data']['match_score']}%")
-        print(f"Summary: {res_json['data']['summary']}")
-        app_id = res_json.get('app_id')
-        print(f"Generated App ID: {app_id}\n")
-    else:
-        print("❌ Job Match Failed:", response.status_code, response.text)
-        return
-        
-    print("--- 3. Testing Application Kit Generation ---")
-    data = {"app_id": app_id}
-    print("Sending POST to generate Cover Letter & Resume...")
-    response = session.post(f"{BASE_URL}/jobs/generate/", data=data, headers=headers)
-    
-    if response.status_code == 200:
-        print("✅ Application Kit Success!")
-        kit = response.json()['data']
-        print("Tailored Resume Skills:", kit['tailored_resume'].get('skills', []))
-        print("\nCover Letter Snippet:", kit['cover_letter'][:200] + "...\n")
-    else:
-        print("❌ Application Kit Failed:", response.status_code, response.text)
-        return
-        
-    print("--- 4. Testing Mark Submitted ---")
-    data = {"app_id": app_id}
-    response = session.post(f"{BASE_URL}/jobs/submit/", data=data, headers=headers)
-    
-    if response.status_code == 200:
-        print("✅ Tracked Successfully!")
-    else:
-        print("❌ Track Failed:", response.status_code, response.text)
+    response = session.post(
+        f"{BASE_URL}/jobs/",
+        data={"job_url": "https://example.com/jobs/sample", "job_description": job_description},
+        headers=headers,
+    )
+    if response.status_code != 200:
+        raise SystemExit(f"Job match failed: {response.status_code} {response.text}")
+    payload = response.json()
+    print("Job match OK")
+    print(json.dumps(payload.get("data", {}), indent=2))
+
+    response = session.post(f"{BASE_URL}/jobs/generate/", data={"app_id": payload.get("app_id")}, headers=headers)
+    if response.status_code != 200:
+        raise SystemExit(f"Application kit failed: {response.status_code} {response.text}")
+    print("Application kit OK")
+
 
 if __name__ == "__main__":
     run_test()
