@@ -149,10 +149,32 @@ def _sync_preferences(candidate: CandidateProfile, data: dict[str, Any]) -> Cand
     preferences.must_have_skills = _read_list(data, "must_have_skills")
     preferences.auto_submit_enabled = bool(data.get("auto_submit_enabled") or data.get("auto_submit") or False)
     preferences.resume_source = str(data.get("resume_source") or "claims").strip()
+    if data.get("min_match_score") not in (None, ""):
+        preferences.min_match_score = _read_int(data.get("min_match_score"), preferences.min_match_score)
+    if data.get("min_match_confidence") not in (None, ""):
+        preferences.min_match_confidence = _read_int(
+            data.get("min_match_confidence"),
+            preferences.min_match_confidence,
+        )
+    if data.get("job_freshness_hours") not in (None, ""):
+        preferences.job_freshness_hours = _read_int(
+            data.get("job_freshness_hours"),
+            preferences.job_freshness_hours,
+        )
+    if data.get("discovery_sources"):
+        preferences.discovery_sources = _read_list(data, "discovery_sources")
     preferences.generate_queries()
     preferences.save()
     return preferences
 
+
+
+def _read_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(100, parsed))
 
 
 def _read_list(data: dict[str, Any], *keys: str) -> list[str]:
