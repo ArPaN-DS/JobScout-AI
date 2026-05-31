@@ -1,14 +1,20 @@
 {% extends 'base.html' %}
 
-{% block title %}Master Profile | AI Career Agent{% endblock %}
-{% block page_title %}Master Profile Setup{% endblock %}
+{% block title %}Candidate Profile | AI Career Agent{% endblock %}
+{% block page_title %}Candidate Profile{% endblock %}
 
 {% block content %}
-<div class="card premium-card">
-    <div class="card-header">
-        <h2>Your Professional Avatar</h2>
-        <p>Upload your resume to let our AI build your Master Profile. This profile will be dynamically adjusted to
-            perfectly match targeted job descriptions later.</p>
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Resume Intelligence</h2>
+            <p>Upload candidate documents and add user-owned details to build the private profile used for matching.</p>
+        </div>
+        {% if has_profile %}
+        <span class="status-pill success">Profile saved</span>
+        {% else %}
+        <span class="status-pill neutral">No profile</span>
+        {% endif %}
     </div>
 
     <form id="profile-form" class="modern-form" enctype="multipart/form-data">
@@ -16,9 +22,9 @@
 
         <div class="form-grid">
             <div class="form-group upload-group">
-                <label for="resume-upload">Resume (PDF)</label>
+                <label for="resume-upload">Resume or Candidate Document</label>
                 <div class="upload-area" id="drop-zone">
-                    <input type="file" id="resume-upload" name="resume" accept="application/pdf" class="file-input"
+                    <input type="file" id="resume-upload" name="resume" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="file-input"
                         required>
                     <div class="upload-content">
                         <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,47 +32,125 @@
                                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
                             </path>
                         </svg>
-                        <span class="upload-text">Click to upload or drag & drop</span>
+                        <span class="upload-text">Choose PDF</span>
                         <span class="file-name" id="file-name-display">No file chosen</span>
                     </div>
                 </div>
             </div>
 
-            <div class="form-group links-group">
+            <div class="form-stack">
                 <div class="input-field">
-                    <label for="linkedin_url">LinkedIn Profile URL</label>
-                    <input type="url" id="linkedin_url" name="linkedin_url"
+                    <label for="full_name">Full Name</label>
+                    <input type="text" id="full_name" name="full_name" value="{{ candidate.full_name|default:'' }}"
+                        placeholder="Candidate name">
+                </div>
+
+                <div class="input-field">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" value="{{ candidate.email|default:'' }}"
+                        placeholder="candidate@example.com">
+                </div>
+
+                <div class="input-field">
+                    <label for="phone">Phone</label>
+                    <input type="text" id="phone" name="phone" value="{{ candidate.phone|default:'' }}"
+                        placeholder="Optional">
+                </div>
+
+                <div class="input-field">
+                    <label for="linkedin_url">LinkedIn URL</label>
+                    <input type="url" id="linkedin_url" name="linkedin_url" value="{{ candidate.linkedin_url|default:'' }}"
                         placeholder="https://linkedin.com/in/username">
                 </div>
 
-                <div class="input-field mt-4">
-                    <label for="github_url">GitHub Profile URL (Optional)</label>
-                    <input type="url" id="github_url" name="github_url" placeholder="https://github.com/username">
+                <div class="input-field">
+                    <label for="github_url">GitHub URL</label>
+                    <input type="url" id="github_url" name="github_url" value="{{ candidate.github_url|default:'' }}"
+                        placeholder="https://github.com/username">
+                </div>
+
+                <div class="input-field">
+                    <label for="portfolio_url">Portfolio URL</label>
+                    <input type="url" id="portfolio_url" name="portfolio_url" value="{{ candidate.portfolio_url|default:'' }}"
+                        placeholder="https://portfolio.example.com">
                 </div>
             </div>
         </div>
 
-        <div class="form-actions mt-6">
-            <button type="submit" class="btn btn-primary btn-glow" id="extract-btn">
-                <span class="btn-text">Generate AI Profile</span>
+        <div class="form-grid">
+            <div class="input-field">
+                <label for="location">Current Location</label>
+                <input type="text" id="location" name="location" value="{{ candidate.location|default:'' }}"
+                    placeholder="City, country, or remote">
+            </div>
+            <div class="input-field">
+                <label for="work_authorization">Work Authorization</label>
+                <input type="text" id="work_authorization" name="work_authorization"
+                    value="{{ candidate.work_authorization|default:'' }}" placeholder="Optional">
+            </div>
+            <div class="input-field">
+                <label for="availability">Availability</label>
+                <input type="text" id="availability" name="availability" value="{{ candidate.availability|default:'' }}"
+                    placeholder="Immediate, 30 days, etc.">
+            </div>
+            <div class="input-field">
+                <label for="target_roles">Target Roles</label>
+                <input type="text" id="target_roles" name="target_roles" placeholder="Product Engineer, Data Analyst">
+            </div>
+            <div class="input-field">
+                <label for="locations">Locations</label>
+                <input type="text" id="locations" name="locations" placeholder="Remote, New York, London">
+            </div>
+            <div class="input-field">
+                <label for="remote_preferences">Remote Preferences</label>
+                <input type="text" id="remote_preferences" name="remote_preferences" placeholder="Remote, Hybrid">
+            </div>
+            <div class="input-field">
+                <label for="must_have_skills">Must-have Skills</label>
+                <input type="text" id="must_have_skills" name="must_have_skills" placeholder="Python, SQL, React">
+            </div>
+            <div class="input-field">
+                <label for="experience_level">Experience Level</label>
+                <input type="text" id="experience_level" name="experience_level" placeholder="Entry, Mid, Senior">
+            </div>
+            <div class="input-field">
+                <label for="min_salary">Minimum Salary</label>
+                <input type="text" id="min_salary" name="min_salary" placeholder="Optional">
+            </div>
+            <div class="input-field">
+                <label for="visa_status">Visa Status</label>
+                <input type="text" id="visa_status" name="visa_status" placeholder="Optional">
+            </div>
+            <div class="input-field">
+                <label for="blocked_companies">Blocked Companies</label>
+                <input type="text" id="blocked_companies" name="blocked_companies" placeholder="Comma-separated">
+            </div>
+            <div class="input-field">
+                <label for="local_project_path">Local Project Folder</label>
+                <input type="text" id="local_project_path" name="local_project_path"
+                    placeholder="Optional local folder path">
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="extract-btn">
+                <span class="btn-text">Create Candidate Profile</span>
                 <span class="spinner hidden"></span>
             </button>
         </div>
     </form>
 
-    <div id="error-banner" class="mt-4 hidden"
-        style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 4px; color: #ef4444; word-wrap: break-word;">
+    <div id="error-banner" class="alert error hidden">
         <strong>Error:</strong> <span id="error-text"></span>
     </div>
-</div>
+</section>
 
-<!-- Results Area -->
-<div id="results-area" class="mt-8 hidden">
-    <div class="card results-card">
-        <h3>Extracted Master Profile</h3>
-        <pre id="json-viewer" class="json-viewer"></pre>
+<section id="results-area" class="panel mt-6 hidden">
+    <div class="panel-header compact">
+        <h3>Candidate Profile JSON</h3>
     </div>
-</div>
+    <pre id="json-viewer" class="json-viewer"></pre>
+</section>
 {% endblock %}
 
 {% block scripts %}
@@ -80,11 +164,12 @@
         const spinner = extractBtn.querySelector('.spinner');
         const resultsArea = document.getElementById('results-area');
         const jsonViewer = document.getElementById('json-viewer');
+        const errorBanner = document.getElementById('error-banner');
+        const errorText = document.getElementById('error-text');
 
-        // Update file name display
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                fileNameDisplay.textContent = e.target.files[0].name;
+        fileInput.addEventListener('change', (event) => {
+            if (event.target.files.length > 0) {
+                fileNameDisplay.textContent = event.target.files[0].name;
                 fileNameDisplay.classList.add('has-file');
             } else {
                 fileNameDisplay.textContent = 'No file chosen';
@@ -92,48 +177,36 @@
             }
         });
 
-        // Form Submission via AJAX
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
 
-            // UI Loading state
-            btnText.textContent = "Extracting with Gemini...";
+            btnText.textContent = 'Extracting...';
             extractBtn.disabled = true;
             spinner.classList.remove('hidden');
             resultsArea.classList.add('hidden');
-
-            const formData = new FormData(form);
+            errorBanner.classList.add('hidden');
 
             try {
                 const response = await fetch('{% url "profile_setup" %}', {
                     method: 'POST',
-                    body: formData,
+                    body: new FormData(form),
                     headers: {
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     }
                 });
-
                 const data = await response.json();
 
-                if (response.ok) {
-                    // Show success
-                    document.getElementById('error-banner').classList.add('hidden');
-                    resultsArea.classList.remove('hidden');
-                    jsonViewer.textContent = JSON.stringify(data.data, null, 2);
-                } else {
-                    document.getElementById('error-banner').classList.remove('hidden');
-                    document.getElementById('error-text').textContent = data.error || ('Server error: ' + response.status);
-                    resultsArea.classList.add('hidden');
+                if (!response.ok) {
+                    throw new Error(data.error || `Server error: ${response.status}`);
                 }
 
+                resultsArea.classList.remove('hidden');
+                jsonViewer.textContent = JSON.stringify(data.data, null, 2);
             } catch (error) {
-                document.getElementById('error-banner').classList.remove('hidden');
-                document.getElementById('error-text').textContent = 'Network Error / Disconnected: ' + error.message;
-                resultsArea.classList.add('hidden');
-                console.error(error);
+                errorBanner.classList.remove('hidden');
+                errorText.textContent = error.message;
             } finally {
-                // Restore UI
-                btnText.textContent = "Generate AI Profile";
+                btnText.textContent = 'Create Candidate Profile';
                 extractBtn.disabled = false;
                 spinner.classList.add('hidden');
             }
