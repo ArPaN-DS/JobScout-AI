@@ -11,9 +11,9 @@ from django.conf import settings
 from .llm import LLMRouter, LLMRequest, LLMTask
 from .resilience import classify_error, ErrorType, screenshot_on_failure
 
-# ─────────────────────────────────────────────
+# 
 # VIEWPORTS & USER AGENTS FOR AUTHENTICITY
-# ─────────────────────────────────────────────
+# 
 
 VIEWPORTS = [
     {"width": 1366, "height": 768},
@@ -28,9 +28,9 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
 ]
 
-# ─────────────────────────────────────────────
+# 
 # STEALTH BROWSER FACTORY
-# ─────────────────────────────────────────────
+# 
 
 async def create_stealth_browser(
     playwright_instance,
@@ -79,9 +79,9 @@ async def create_stealth_browser(
     return context, page
 
 
-# ─────────────────────────────────────────────
+# 
 # HUMAN BEHAVIOR SIMULATIONS
-# ─────────────────────────────────────────────
+# 
 
 async def human_move_to(page: Page, x: float, y: float):
     """Moves cursor to (x, y) direct but with slight natural delay."""
@@ -188,9 +188,9 @@ async def page_load_settle(page: Page):
     await asyncio.sleep(random.uniform(1.0, 2.5))
 
 
-# ─────────────────────────────────────────────
+# 
 # ADAPTIVE SELF-HEALING SELECTORS
-# ─────────────────────────────────────────────
+# 
 
 async def find_element_fuzzy(page: Page, selectors: List[str], keywords: List[str]) -> Optional[str]:
     """
@@ -220,7 +220,7 @@ async def find_element_fuzzy(page: Page, selectors: List[str], keywords: List[st
             for xpath in xpath_selectors:
                 el = page.locator(xpath).first
                 if await el.count() > 0 and await el.is_visible():
-                    print(f"  🧠 Self-healing selector matched element via XPath: {xpath}")
+                    print(f"   Self-healing selector matched element via XPath: {xpath}")
                     return xpath
         except Exception:
             continue
@@ -228,9 +228,9 @@ async def find_element_fuzzy(page: Page, selectors: List[str], keywords: List[st
     return None
 
 
-# ─────────────────────────────────────────────
+# 
 # FORM FIELD EXTRACTION & LLM SMART FILL
-# ─────────────────────────────────────────────
+# 
 
 async def extract_form_fields(page: Page) -> List[Dict[str, Any]]:
     """Extracts descriptive metadata of all visible form inputs on the current page."""
@@ -277,7 +277,7 @@ async def extract_form_fields(page: Page) -> List[Dict[str, Any]]:
         """)
         return fields
     except Exception as e:
-        print(f"  ⚠️ Form field extraction failed: {e}")
+        print(f"  Form field extraction failed: {e}")
         return []
 
 
@@ -301,16 +301,16 @@ async def smart_fill_form(fields: List[Dict[str, Any]], profile: Dict[str, Any])
     prompt = f"""You are filling out a job application form. Map the candidate's profile data to the form fields.
 
 CANDIDATE PROFILE:
-- Full Name: {profile.get('name', 'Arpan Majumdar')}
-- Email: {profile.get('email', 'arpanmajumdar952@gmail.com')}
-- Phone: {profile.get('phone', '9635082849')}
-- Location: {profile.get('location', 'West Bengal, India')}
-- Target Roles: {profile.get('target_roles', ['AI/ML Engineer'])}
-- Skills: {profile.get('skills', ['Python', 'NLP', 'PyTorch'])}
-- Experience: M.Sc. Data Science, Publications in ACL 2025, CLEF 2025. 2+ years production AI experience.
-- LinkedIn: {profile.get('linkedin_url', 'linkedin.com/in/arpanmajumdar')}
-- GitHub: {profile.get('github_url', 'github.com/ArPaN-DS')}
-- Work Authorization: {profile.get('visa_status', 'Authorized')}
+- Full Name: {profile.get('name', 'Candidate Name')}
+- Email: {profile.get('email', '')}
+- Phone: {profile.get('phone', '')}
+- Location: {profile.get('location', '')}
+- Target Roles: {profile.get('target_roles', [])}
+- Skills: {profile.get('skills', [])}
+- Experience: {profile.get('experience', [])}
+- LinkedIn: {profile.get('linkedin_url', '')}
+- GitHub: {profile.get('github_url', '')}
+- Work Authorization: {profile.get('visa_status', '')}
 
 FORM FIELDS:
 {chr(10).join(field_descriptions)}
@@ -342,10 +342,10 @@ IMPORTANT: Return ONLY the JSON, no markdown, no explanation."""
         text = text.strip()
 
         mapping = json.loads(text)
-        print(f"  🧠 LLM mapped {len(mapping)} fields dynamically!")
+        print(f"  LLM mapped {len(mapping)} fields dynamically.")
         return mapping
     except Exception as e:
-        print(f"  ⚠️ LLM Smart Fill failed: {e}. Falling back to basic heuristics.")
+        print(f"  LLM smart fill failed: {e}. Falling back to basic heuristics.")
         
         # Fallback basic heuristics
         mapping = {}
@@ -355,12 +355,12 @@ IMPORTANT: Return ONLY the JSON, no markdown, no explanation."""
             if not key:
                 continue
             if "first" in label or "fname" in label:
-                mapping[key] = profile.get("name", "Arpan").split()[0]
+                mapping[key] = profile.get("name", "").split()[0] if profile.get("name") else ""
             elif "last" in label or "lname" in label:
-                parts = profile.get("name", "Majumdar").split()
+                parts = profile.get("name", "").split()
                 mapping[key] = parts[-1] if len(parts) > 1 else ""
             elif "name" in label:
-                mapping[key] = profile.get("name", "Arpan Majumdar")
+                mapping[key] = profile.get("name", "")
             elif "email" in label:
                 mapping[key] = profile.get("email", "")
             elif "phone" in label or "mobile" in label or "tel" in label:
@@ -397,12 +397,12 @@ async def fill_field(page: Page, field: Dict[str, Any], value: str):
         else:
             await human_type(page, selector, value)
     except Exception as e:
-        print(f"    ⚠️ Failed to fill field {selector}: {e}")
+        print(f"     Failed to fill field {selector}: {e}")
 
 
-# ─────────────────────────────────────────────
+# 
 # MAIN AUTO APPLY PIPELINE
-# ─────────────────────────────────────────────
+# 
 
 async def try_auto_apply(
     apply_url: str,
@@ -474,9 +474,9 @@ async def try_auto_apply(
                     if os.path.exists(absolute_pdf_path):
                         await file_inputs.first.set_input_files(absolute_pdf_path)
                         await asyncio.sleep(random.uniform(1.0, 2.0))
-                        print("  [AutoApply] ✓ Tailored resume PDF uploaded successfully.")
+                        print("  [AutoApply]  Tailored resume PDF uploaded successfully.")
                 except Exception as ex:
-                    print(f"  ⚠️ Resume upload failed: {ex}")
+                    print(f"   Resume upload failed: {ex}")
 
             # 7. Form Field Extraction & Smart Fill
             fields = await extract_form_fields(page)
@@ -517,10 +517,10 @@ async def try_auto_apply(
 
         except PlaywrightTimeoutError:
             error_msg = "Page load timeout (PlaywrightTimeoutError)."
-            print(f"  ⚠️ [AutoApply] Timeout: {error_msg}")
+            print(f"   [AutoApply] Timeout: {error_msg}")
             return False, "failed", "", error_msg
         except Exception as e:
             error_type = classify_error(error=e)
             error_msg = f"{error_type.value}: {str(e)[:150]}"
-            print(f"  ⚠️ [AutoApply] Critical error during apply: {error_msg}")
+            print(f"   [AutoApply] Critical error during apply: {error_msg}")
             return False, "failed", "", error_msg
