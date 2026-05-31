@@ -10,6 +10,10 @@ from typing import Optional, Callable, Any
 
 from django.conf import settings
 
+from .logging_utils import get_logger
+
+logger = get_logger(__name__)
+
 # ─────────────────────────────────────────────
 # ERROR CLASSIFICATION
 # ─────────────────────────────────────────────
@@ -81,15 +85,21 @@ async def retry_with_backoff(
             error_type = classify_error(error=e)
 
             if error_type not in retryable_errors or attempt == max_attempts:
-                print(f"  ❌ [{label}] Failed after {attempt} attempts: {e}")
+                logger.warning("[%s] Failed after %s attempts: %s", label, attempt, e)
                 raise
 
             delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
             if jitter:
                 delay *= random.uniform(0.5, 1.5)
 
-            print(f"  ⚡ [{label}] Attempt {attempt}/{max_attempts} failed ({error_type.value}). "
-                  f"Retrying in {delay:.1f}s...")
+            logger.info(
+                "[%s] Attempt %s/%s failed (%s). Retrying in %.1fs",
+                label,
+                attempt,
+                max_attempts,
+                error_type.value,
+                delay,
+            )
             await asyncio.sleep(delay)
 
     raise last_exception
@@ -125,6 +135,13 @@ class CircuitBreaker:
             self._circuits[portal] = CircuitState()
         return self._circuits[portal]
 
+    def cooldown_remaining(self, portal: str) -> int:
+        state = self._get_state(portal)
+        if not state.is_open or not state.opened_at:
+            return 0
+        elapsed = (datetime.now() - state.opened_at).total_seconds()
+        return max(0, int(self.recovery_timeout - elapsed))
+
     def is_available(self, portal: str) -> bool:
         state = self._get_state(portal)
         if not state.is_open:
@@ -133,7 +150,7 @@ class CircuitBreaker:
         if state.opened_at and (datetime.now() - state.opened_at).seconds >= self.recovery_timeout:
             state.is_open = False
             state.failures = 0
-            print(f"  🔄 [{portal}] Circuit breaker reset (recovery timeout elapsed)")
+            logger.info("[%s] Circuit breaker reset (recovery timeout elapsed)", portal)
             return True
 
         return False
@@ -154,8 +171,13 @@ class CircuitBreaker:
         if state.failures >= self.failure_threshold and not state.is_open:
             state.is_open = True
             state.opened_at = datetime.now()
-            print(f"  🔴 [{portal}] Circuit OPEN — {state.failures} consecutive failures. "
-                  f"Skipping for {self.recovery_timeout}s. Last error: {error[:80]}")
+            logger.warning(
+                "[%s] Circuit OPEN after %s failures; pausing %ss. Last error: %s",
+                portal,
+                state.failures,
+                self.recovery_timeout,
+                error[:80],
+            )
 
 
 # Global circuit breaker instance
@@ -178,10 +200,10 @@ async def screenshot_on_failure(page, portal: str, reason: str = "") -> Optional
         filepath = os.path.join(screenshots_dir, filename)
 
         await page.screenshot(path=filepath, full_page=False)
-        print(f"  📸 Screenshot saved: {filepath}")
+        logger.info("Screenshot saved: %s", filepath)
         
         # Return path relative to MEDIA_ROOT/media for easy URL rendering
         return os.path.join("screenshots", filename)
     except Exception as e:
-        print(f"  ⚠️ Screenshot failed: {e}")
+        logger.warning("Screenshot failed: %s", e)
         return None
