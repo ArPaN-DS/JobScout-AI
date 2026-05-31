@@ -1,411 +1,153 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# Job_bro_AI .gitignore
-# Comprehensive ignore patterns for Python Django project with PII protection
-# ═══════════════════════════════════════════════════════════════════════════
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PYTHON & VIRTUALENV
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Python compiled files
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+.hypothesis/
 
-# C extensions
-*.c
-*.so
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+job_finder/
+job_finder_env/
+env.bak/
+venv.bak/
+__pypackages__/
 
-# Distribution / packaging
-.Python
+# Build and packaging output
 build/
-develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
+*.egg-info/
+*.egg
+*.whl
 wheels/
 pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 MANIFEST
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Unit test / coverage reports
+# Test and coverage output
+.coverage
+.coverage.*
+coverage.xml
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
+junit.xml
+test-results/
+playwright-report/
 
-# pytype static type analyzer
-.pytype/
-.pytype-link
-
-# Cython debug symbols
-cython_debug/
-
-# Virtual environments (multiple patterns for compatibility)
-venv/
-ENV/
-env/
-.venv
-.env.local
-job_finder/            # Main project venv
-job_finder_env/        # Alternative venv location
-env.bak/
-venv.bak/
-
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# ─────────────────────────────────────────────────────────────────────────────
-# DJANGO
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Django
+# Django local runtime files
 *.log
+logs/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+verification.sqlite3*
+staticfiles/
+static/collected/
+media/
+tmp_uploads/
+temp_uploads/
+uploads/
 
-# Migrations (but DO commit clean migrations)
-# Note: Clean migrations should be committed
-# /*/migrations/0*.py  # Uncomment if you want to ignore numbered migrations
-
-# Django static files (collected)
-/staticfiles/
-/static/collected/
-
-# Django media files (user uploads - PII!)
-/media/
-/tmp_uploads/
-
-# Django cache
-*.cache
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECRETS & CREDENTIALS (CRITICAL - NEVER COMMIT THESE)
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Environment files - NEVER COMMIT
+# Secrets and credentials
 .env
 .env.*
 !.env.example
-.env.local
-.env.production
-.env.*.local
-.env.*.example
-
-# API Keys and credentials
-.api_keys
+*.pem
+*.key
+*.token
+token.txt
+tokens.db
 api_keys.json
 credentials.json
 secrets.json
 credentials/
 auth/
-
-# OAuth tokens
-*.token
-tokens.db
-token.txt
-
-# SSH keys
-*.pem
-*.pub
-id_rsa*
-id_dsa*
-id_ecdsa*
-id_ed25519*
-~/.ssh/
-
-# AWS credentials
 .aws/
-~/.aws/
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PERSONALLY IDENTIFIABLE INFORMATION (PII) - CRITICAL
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Resume files (CRITICAL - Contains personal information)
+# Private candidate data and generated artifacts
 *.pdf
-*.docx
 *.doc
+*.docx
 *.odt
 *.rtf
 *.pages
-
-# Resume data extracts
-master_profile.json
-profile_data.json
-extracted_profiles.json
-*_profile.json
-
-# Candidate screenshots (may contain PII)
+*.xlsx
+*.xls
+*.csv
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.bmp
-screenshots/
-captures/
-
-# Profile data directories
-tmp_uploads/
+master_profile.json
+profile_data.json
+extracted_profiles.json
+*_profile.json
 user_data/
 candidates/
 profiles/
 personal_data/
+screenshots/
+captures/
 
-# Spreadsheets with candidate data
-*.xlsx
-*.xls
-*.csv        # May contain personal info (handle carefully)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# IDE & EDITOR
-# ─────────────────────────────────────────────────────────────────────────────
-
-# VS Code
-.vscode/
-*.code-workspace
-.history/
-.history
-
-# PyCharm / IntelliJ
-.idea/
-*.iml
-*.iws
-*.ipr
-out/
-
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# Vim
-[._]*.s[a-v][a-z]
-[._]*.sw[a-p]
-[._]s[a-v][a-z]
-[._]sw[a-p]
-*~
-.swp
-.swo
-*.swn
-
-# Emacs
-*~
-\#*\#
-.\#*
-*.elc
-auto-save-list/
-
-# Nano
-.nano_history
-
-# ─────────────────────────────────────────────────────────────────────────────
-# OPERATING SYSTEM
-# ─────────────────────────────────────────────────────────────────────────────
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-*.lnk
-
-# Linux
-.directory
-.Trash-*/
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PACKAGE MANAGERS
-# ─────────────────────────────────────────────────────────────────────────────
-
-# npm
-node_modules/
-npm-debug.log
-yarn-error.log
-.npm
-.yarn
-
-# pip
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Poetry
-poetry.lock
-
-# pipenv
-Pipfile.lock
-
-# ─────────────────────────────────────────────────────────────────────────────
-# DATABASE
-# ─────────────────────────────────────────────────────────────────────────────
-
-# SQLite
-*.db
-*.sqlite
-*.sqlite3
-*.sqlite3-journal
-
-# PostgreSQL
-.psycopg2_version
-
-# MySQL
-*.mysql_db
-
-# Redis
-*.rdb
-dump.rdb
-
-# MongoDB
-*.mongodb
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BUILD & DISTRIBUTION
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Compiled files
-*.pyc
-*.pyo
-*.so
-*.o
-*.a
-
-# Build artifacts
-build/
-dist/
-*.egg-info/
-.eggs/
-.pytest_cache/
-
-# Wheel
-*.whl
-
-# ─────────────────────────────────────────────────────────────────────────────
-# LOGGING & TEMPORARY FILES
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Log files
-*.log
-logs/
-*.out
-*.err
-*.tmp
-
-# Temporary files
-tmp/
-temp/
-*.temp
-*.tmp
-*.bak
-*.swp
-*~
-.~*
-
-# Test temporary files
-.pytest_cache/
-.nox/
-.coverage
-.coverage.*
-htmlcov/
-
-# Pyre type checker
-.pyre/
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PROJECT SPECIFIC
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Local testing/development files
-test_output/
-test_data/
-.test_env
-test_results.json
-
-# Job_bro_AI specific
-*.sqlite3
-verification.sqlite3*
-master_profile.json
-
-# Temporary uploads
-tmp_uploads/
-temp_uploads/
-uploads/
-
-# Local documentation (keep only important docs)
+# Local notes and scratch files
 local_notes.md
 TODO.md
 NOTES.md
 notes/
 scratch/
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GIT
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Git merge conflicts
+test_output/
+test_data/
+.test_env
+test_results.json
+*.tmp
+*.temp
+*.bak
 *.orig
-.merge_cache/
+*.resolved
 
-# ─────────────────────────────────────────────────────────────────────────────
-# DOCKER (if used)
-# ─────────────────────────────────────────────────────────────────────────────
+# OS and editor files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
 
+# Node or browser tooling, if added
+node_modules/
+npm-debug.log
+yarn-error.log
+.npm/
+.yarn/
+
+# Docker and CI local overrides
 .dockerignore
 docker-compose.override.yml
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CI/CD
-# ─────────────────────────────────────────────────────────────────────────────
-
 .github/workflows/secrets/
 CI_ENV_FILE
 
-# ═══════════════════════════════════════════════════════════════════════════
-# WHITELISTING - Files to ALWAYS COMMIT (override above patterns)
-# ═══════════════════════════════════════════════════════════════════════════
-
-# Do commit these important files:
+# Keep important public project files tracked
 !.gitignore
 !.env.example
 !requirements.txt
@@ -414,87 +156,23 @@ CI_ENV_FILE
 !LICENSE
 !CONTRIBUTING.md
 !.github/
+!.github/workflows/
+!.github/workflows/*.yml
 
-# Documentation should be committed
+# Keep documentation tracked
 !docs/
 !docs/**/*.md
 
-# Templates should be committed
+# Keep source templates and static assets tracked
 !templates/
 !templates/**/*.html
-
-# Static files source should be committed
+!static/
 !static/css/
 !static/css/**/*.css
+!static/js/
+!static/js/**/*.js
 
-# Do commit clean migrations
-!/*/migrations/
-!/*/migrations/__init__.py
-!/*/migrations/*.py
-
-# ═══════════════════════════════════════════════════════════════════════════
-# COMMENTS & NOTES
-# ═══════════════════════════════════════════════════════════════════════════
-
-# This .gitignore is comprehensive and prioritizes:
-# 1. Security: API keys, credentials, tokens
-# 2. Privacy: Resume files, candidate profiles, PII
-# 3. Cleanliness: Build artifacts, logs, temp files
-# 4. Portability: Virtual environments
-#
-# IMPORTANT REMINDERS:
-# • Never commit .env files (use .env.example as template)
-# • Never commit resume PDFs or profile JSONs
-# • Never commit database files with real data
-# • Always verify before committing with: git status
-# • Use: git diff --cached (to review staged changes)
-# • Use: git add -p (for interactive staging)
-#
-# If you accidentally commit sensitive files:
-# git rm --cached <file>
-# git commit --amend
-# git push origin <branch> --force-with-lease  (use carefully!)
-
-# ── IDE / Editor ──────────────────────────────────────────────────
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# ── OS ────────────────────────────────────────────────────────────
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V8
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# ── Testing ───────────────────────────────────────────────────────
-.pytest_cache/
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-.hypothesis/
-junit.xml
-
-# ── Node (if any tooling is added) ───────────────────────────────
-node_modules/
-.npm/
-.yarn/
-
-# ── Playwright / Browser automation ──────────────────────────────
-playwright-report/
-test-results/
-
-# ── Misc ─────────────────────────────────────────────────────────
-*.bak
-*.tmp
-*.orig
-*.resolved
+# Keep Django migrations tracked
+!*/migrations/
+!*/migrations/__init__.py
+!*/migrations/*.py
