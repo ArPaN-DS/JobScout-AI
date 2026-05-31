@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Provider Settings | AI Career Agent{% endblock %}
+{% block page_title %}Provider Settings{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>LLM Provider Router</h2>
+            <p>Providers are tried in order only when their key is configured. Ollama stays off until enabled.</p>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Provider</th>
+                    <th>Model</th>
+                    <th>Status</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for provider in provider_statuses %}
+                <tr>
+                    <td>{{ provider.name }}</td>
+                    <td>{{ provider.model }}</td>
+                    <td>
+                        {% if provider.enabled %}
+                        <span class="status-pill success">Ready</span>
+                        {% else %}
+                        <span class="status-pill neutral">Off</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ provider.reason|default:"Configured and available" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Environment Contract</h3>
+    </div>
+    <pre class="json-viewer">{{ provider_statuses_json }}</pre>
+</section>
+{% endblock %}
