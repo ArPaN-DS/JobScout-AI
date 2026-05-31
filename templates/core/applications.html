@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}Applications | AI Career Agent{% endblock %}
+{% block page_title %}Applications{% endblock %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2>Application Tracker</h2>
+            <p>All sourced, matched, and applied jobs. Tailored PDFs and screenshots are available for auto-applied and manual-required entries.</p>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a href="{% url 'job_queue' %}" class="btn btn-secondary">View Job Queue</a>
+            <a href="{% url 'metrics_dashboard' %}" class="btn btn-secondary">Metrics</a>
+        </div>
+    </div>
+    {% if budget %}
+    <p class="muted" style="margin-bottom:12px;">
+        LLM spend today: <strong>${{ budget.spent_usd }}</strong> / ${{ budget.daily_limit_usd }}
+        {% if budget.over_budget %}<span class="status-pill warn">Over budget</span>{% endif %}
+    </p>
+    {% endif %}
+
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Job</th>
+                    <th>Score</th>
+                    <th>Summary</th>
+                    <th>Tailored Resume</th>
+                    <th>Screenshot</th>
+                    <th>Job Link</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for app in applications %}
+                <tr>
+                    <td>
+                        {% if app.status == 'auto_applied' %}
+                        <span class="status-pill" style="background:#e8f7ef; color:#16835f;"> Auto Applied</span>
+                        {% elif app.status == 'manual_required' %}
+                        <span class="status-pill" style="background:#fff4e5; color:#a16207;"> Manual Required</span>
+                        {% elif app.status == 'matched' %}
+                        <span class="status-pill" style="background:#eff6ff; color:#1d478c;">Matched</span>
+                        {% elif app.status == 'kit_generated' %}
+                        <span class="status-pill" style="background:#f5f3ff; color:#6d28d9;">Kit Ready</span>
+                        {% elif app.status == 'submitted' %}
+                        <span class="status-pill success">Submitted</span>
+                        {% elif app.status == 'failed' %}
+                        <span class="status-pill" style="background:#fff1f0; color:#b42318;"> Failed</span>
+                        {% elif app.status == 'low_match' %}
+                        <span class="status-pill neutral">Low Match</span>
+                        {% elif app.status == 'scraped' %}
+                        <span class="status-pill neutral">Scraped</span>
+                        {% else %}
+                        <span class="status-pill neutral">{{ app.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if app.source_lead %}
+                        <strong style="display: block; font-size: 0.9rem;">{{ app.source_lead.title|default:""|truncatechars:40 }}</strong>
+                        <span style="color: var(--muted); font-size: 0.82rem;">{{ app.source_lead.company|default:"" }}</span>
+                        {% if app.source_lead.location %}
+                        <span style="display: block; color: var(--muted); font-size: 0.78rem;"> {{ app.source_lead.location }}</span>
+                        {% endif %}
+                        {% else %}
+                        <span style="color: var(--muted); font-size: 0.85rem;">{{ app.job_url|truncatechars:50|default:"Manual" }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if app.match_score != None %}
+                        <span style="font-weight: 760; font-size: 1.05rem; color: {% if app.match_score >= 80 %}var(--success){% elif app.match_score >= 60 %}var(--warning){% else %}var(--danger){% endif %};">
+                            {{ app.match_score }}%
+                        </span>
+                        {% else %}
+                        <span style="color: var(--muted);"></span>
+                        {% endif %}
+                    </td>
+                    <td style="max-width: 280px;">
+                        <span style="font-size: 0.85rem; color: #334155; word-break: break-word;">
+                            {{ app.match_summary|default:app.job_description|truncatechars:110 }}
+                        </span>
+                        {% if app.error_message %}
+                        <span style="display: block; color: var(--danger); font-size: 0.78rem; margin-top: 4px;">{{ app.error_message|truncatechars:120 }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if app.tailored_resume_pdf %}
+                        <a href="{{ MEDIA_URL }}{{ app.tailored_resume_pdf }}"
+                           target="_blank"
+                           class="btn btn-secondary"
+                           style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
+                            Download PDF
+                        </a>
+                        {% else %}
+                        <span style="color: var(--muted); font-size: 0.82rem;"></span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if app.screenshot %}
+                        <a href="{{ MEDIA_URL }}{{ app.screenshot }}"
+                           target="_blank"
+                           class="btn btn-secondary"
+                           style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
+                            - View
+                        </a>
+                        {% else %}
+                        <span style="color: var(--muted); font-size: 0.82rem;"></span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if app.job_url %}
+                        <a href="{{ app.job_url }}" target="_blank" class="btn btn-secondary"
+                           style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
+                            - Open
+                        </a>
+                        {% elif app.source_lead and app.source_lead.job_url %}
+                        <a href="{{ app.source_lead.job_url }}" target="_blank" class="btn btn-secondary"
+                           style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
+                            - Open
+                        </a>
+                        {% else %}
+                        <span style="color: var(--muted); font-size: 0.82rem;"></span>
+                        {% endif %}
+                    </td>
+                    <td style="white-space: nowrap; color: var(--muted); font-size: 0.82rem;">
+                        {{ app.created_at|date:"M d, Y" }}<br>
+                        <span style="font-size: 0.75rem;">{{ app.created_at|time:"H:i" }}</span>
+                    </td>
+                    <td>
+                        {% if app.status == 'failed' or app.status == 'matched' %}
+                        <form method="post" action="{% url 'generate_kit' %}" class="kit-retry-form" style="display:flex; flex-direction:column; gap:4px;">
+                            {% csrf_token %}
+                            <input type="hidden" name="app_id" value="{{ app.id }}">
+                            <button type="submit" class="btn btn-primary btn-sm">{% if app.status == 'failed' %}Retry kit{% else %}Generate kit{% endif %}</button>
+                            <button type="submit" name="compact" value="1" class="btn btn-secondary btn-sm">Compact retry</button>
+                        </form>
+                        {% else %}{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 36px; color: var(--muted);">
+                        <div style="font-size: 2rem; margin-bottom: 10px;"></div>
+                        No applications tracked yet. Run the job finder to start collecting matches.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+{% if applications %}
+<section class="panel mt-6">
+    <div class="panel-header compact">
+        <h3>Pipeline Summary</h3>
+    </div>
+    <div class="status-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+        <div class="status-card" style="text-align: center;">
+            <span class="eyebrow">Total</span>
+            <div style="font-size: 1.8rem; font-weight: 780; color: var(--ink);">{{ applications|length }}</div>
+        </div>
+        <div class="status-card" style="text-align: center;">
+            <span class="eyebrow">Auto Applied</span>
+            <div style="font-size: 1.8rem; font-weight: 780; color: var(--success);">
+                {{ applications|dictsortreversed:"status"|length }}
+            </div>
+        </div>
+        <div class="status-card" style="text-align: center;">
+            <span class="eyebrow">Run Job Finder</span>
+            <div style="margin-top: 6px;">
+                <code style="font-size: 0.75rem; background: #0f172a; color: #dbeafe; padding: 4px 8px; border-radius: 6px;">
+                    manage.py run_job_finder
+                </code>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
