@@ -146,7 +146,7 @@ EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USE_TLS=true
-EMAIL_HOST_USER=your_email@gmail.com
+EMAIL_HOST_USER=smtp-user@example.com
 EMAIL_HOST_PASSWORD=your_app_password
 
 # Logging
@@ -702,10 +702,9 @@ curl https://yourdomain.com/health
 
 ## Support
 
-- 📖 [Django Deployment Guide](https://docs.djangoproject.com/en/5.2/howto/deployment/)
-- 🐛 [Issue Tracker](https://github.com/ArPaN-DS/Job_bro_AI/issues)
-- 📧 Email: arpanmajumdar952@gmail.com
+- [Django Deployment Guide](https://docs.djangoproject.com/en/5.2/howto/deployment/)
+- [Issue Tracker](https://github.com/ArPaN-DS/Job_bro_AI/issues)
 
 ---
 
-**Ready to deploy! 🚀**
+**Ready to deploy! **
