@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DJANGO_SECRET_KEY: ci-only-secret-key-for-public-safety-checks-please-rotate
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      CSRF_TRUSTED_ORIGINS: https://localhost
+      DAILY_LLM_BUDGET_USD: "100"
+      KIT_CRITIC_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install coverage
+      - name: Django checks (deploy profile)
+        env:
+          DJANGO_SETTINGS_MODULE: career_agent.deploy_settings
+        run: |
+          python manage.py check
+          python manage.py check --deploy
+      - name: Migrate
+        env:
+          DJANGO_SETTINGS_MODULE: career_agent.settings
+          DJANGO_DEBUG: "true"
+        run: python manage.py migrate --noinput
+      - name: Tests
+        env:
+          DJANGO_SETTINGS_MODULE: career_agent.settings
+          DJANGO_DEBUG: "true"
+        run: coverage run --source=core manage.py test core
+      - name: Coverage report
+        run: |
+          coverage report --include=core/llm.py,core/ai_service.py,core/schemas.py,core/job_sources.py,core/errors.py,core/metrics.py --fail-under=55
+      - name: Coverage XML
+        if: matrix.os == 'ubuntu-latest'
+        run: coverage xml
