@@ -1,0 +1,12 @@
+{
+  "match_score": 88,
+  "summary": "Strong alignment with Python and Django experience.",
+  "matching_skills": ["Python", "Django"],
+  "missing_skills": ["Kubernetes"],
+  "confidence": 82,
+  "risk_flags": ["Limited cloud production evidence."],
+  "hard_filters": [],
+  "why_apply": "Role matches backend strengths.",
+  "salary_signal": "",
+  "seniority_alignment": "Mid-level alignment."
+}
