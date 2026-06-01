@@ -21,7 +21,7 @@
             <button type="button" class="btn btn-secondary" id="btn-refresh-status">Refresh status</button>
         </div>
     </div>
-    <p id="discovery-status-line" class="muted">Queue: {{ queue_stats.total|default:0 }} leads 
+    <p id="discovery-status-line" class="muted">Queue: {{ queue_stats.total|default:0 }} leads —
         {{ queue_stats.matched|default:0 }} matched, {{ new_leads_count }} new to score.</p>
     <div id="pipeline-progress"></div>
 </section>
@@ -54,8 +54,8 @@
                         <span class="status-pill warn">Paused</span>
                         {% endif %}
                     </td>
-                    <td>{% if source.cooldown_remaining_seconds %}{{ source.cooldown_remaining_seconds }}s{% else %}{% endif %}</td>
-                    <td>{{ source.last_run_status|default:"" }}</td>
+                    <td>{% if source.cooldown_remaining_seconds %}{{ source.cooldown_remaining_seconds }}s{% else %}—{% endif %}</td>
+                    <td>{{ source.last_run_status|default:"—" }}</td>
                     <td>{{ source.last_imported }}</td>
                 </tr>
                 {% endfor %}
