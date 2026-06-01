@@ -150,9 +150,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("[DONE] Job Finder & Auto-Applier Loop Finished successfully!"))
 
 
-# 
+# ─────────────────────────────────────────────
 # NOTIFICATION DISPATCHER (Telegram & Discord support)
-# 
+# ─────────────────────────────────────────────
 
 async def send_pipeline_notification(app: Application, auto_submit: bool):
     """Sends detailed application match alert and tailored PDF file via Telegram/Discord hooks."""
