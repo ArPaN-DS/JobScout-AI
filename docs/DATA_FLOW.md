@@ -1,120 +1,272 @@
-# Data Flow
+# Job_bro_AI Runtime Data Flow Diagrams
 
-This document gives the main runtime flows for the application. It is written for maintainers who need to understand where data enters, how it is transformed, and where it is persisted.
+This manual details the step-by-step runtime sequence flows for **Job_bro_AI**. It maps the interactions between the browser client, Django views, background worker tasks, the AI service, and the external LLM endpoints.
 
-## Profile Extraction Flow
+---
+
+## 1. Candidate Onboarding & Profile Extraction Flow
+
+This flow triggers when a user uploads their resume to extract and compile a structured profile.
 
 ```mermaid
 sequenceDiagram
-    participant Browser
-    participant Views as core.views
-    participant Files as tmp_uploads
-    participant AI as CareerAgentAI
-    participant Schema as MasterProfile
-    participant Store as profile_store
-    participant DB as Database
+    autonumber
+    actor User as Operator (Browser)
+    participant Views as core.views.onboard_profile
+    participant Files as OS Filesystem (tmp_uploads/)
+    participant AI as core.ai_service (CareerAgentAI)
+    participant Router as core.llm (LLMRouter)
+    participant Schemas as core.schemas (MasterProfile)
+    participant Store as core.profile_store (save_profile)
+    participant DB as Database (SQLite)
 
-    Browser->>Views: POST candidate document and manual fields
-    Views->>Views: Validate size, suffix, and content type
-    Views->>Files: Save temporary upload
-    Views->>AI: Extract profile from document
-    AI->>Schema: Validate structured profile
-    Views->>Store: Save profile, document metadata, preferences
-    Store->>DB: CandidateProfile, CandidateDocument, EvidenceSource, ProfileClaim
-    Views-->>Browser: Redirect to review or return JSON error
+    User->>Views: POST /onboard/ (File payload + preferences)
+    activate Views
+    Views->>Views: Validate file extension (.pdf/.docx) & limit (<10MB)
+    
+    Views->>Files: Save original document to tmp_uploads/
+    activate Files
+    Files-->>Views: Document absolute path
+    deactivate Files
+    
+    Views->>Views: Extract raw text from file using pdfplumber/docx
+    Views->>AI: extract_profile_from_document(raw_text)
+    activate AI
+    
+    AI->>Router: request_structured_completion(prompt, MasterProfile)
+    activate Router
+    Router->>Router: Check daily budget limit
+    Router->>Router: Query API (Gemini/OpenAI/Anthropic)
+    Router-->>AI: Raw JSON string response
+    deactivate Router
+    
+    AI->>Schemas: MasterProfile.model_validate_json(raw_json)
+    activate Schemas
+    Note over AI,Schemas: Ensures LLM output strictly matches Pydantic fields
+    Schemas-->>AI: Validated MasterProfile Pydantic Object
+    deactivate Schemas
+    
+    AI-->>Views: Return Pydantic MasterProfile Object
+    deactivate AI
+
+    Views->>Store: save_profile(candidate, master_profile_obj)
+    activate Store
+    Store->>DB: INSERT/UPDATE CandidateProfile record
+    Store->>DB: INSERT CandidateDocument record (linked to file path)
+    Store->>DB: INSERT EvidenceSource record
+    Store->>DB: Bulk INSERT ProfileClaim records (atomized sentences)
+    Store-->>Views: Success confirmation
+    deactivate Store
+
+    Views-->>User: Redirect to profile review view (/profile/)
+    deactivate Views
 ```
 
-Failure handling:
+---
 
-- Invalid uploads return user-safe validation errors.
-- Extraction failures are formatted through `core.errors`.
-- Temporary files and uploads must remain outside Git.
+## 2. Job Discovery & Scoring Flow
 
-## Discovery and Scoring Flow
+This sequence executes when the background queue or CLI command checks for new job leads and runs AI matching.
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Views as core.views
+    autonumber
+    actor User as Operator / Scheduler
+    participant Views as core.views.start_discovery
+    participant Tasks as core.tasks.run_discovery_task
+    participant Runner as core.job_runner.run_tracked
+    participant Discov as core.discovery.resolve_discovery_config
+    participant Adapters as core.sources (JobSourceAdapters)
+    participant AI as core.ai_service (CareerAgentAI)
+    participant DB as Database (SQLite)
+
+    User->>Views: POST /queue/start-discovery/
+    activate Views
+    Views->>Tasks: Enqueue run_discovery_task (async job-id)
+    Views-->>User: 200 OK (Job status polling endpoint)
+    deactivate Views
+
+    activate Tasks
+    Tasks->>Runner: run_tracked(job_id, discovery_loop)
+    activate Runner
+    Runner->>DB: Update PipelineJob status to RUNNING
+
+    Runner->>Discov: resolve_discovery_config(candidate)
+    activate Discov
+    Discov-->>Runner: List of active source IDs (e.g. ['jobspy', 'remoteok'])
+    deactivate Discov
+
+    loop For each source adapter ID
+        Runner->>Adapters: Build adapter & call fetch()
+        activate Adapters
+        Adapters->>Adapters: Perform HTTP scraping or API call
+        Adapters-->>Runner: Return list of RawJob structures
+        deactivate Adapters
+        
+        loop For each RawJob
+            Runner->>Runner: Generate dedupe fingerprint (SHA256)
+            Runner->>DB: Check if fingerprint exists in JobLead
+            alt Fingerprint is duplicate
+                Runner->>Runner: Skip importing
+            else Fingerprint is unique
+                Runner->>DB: INSERT JobLead (status=NEW, fingerprint)
+            end
+        end
+    end
+
+    Note over Runner,AI: Phase 2: Scoring newly discovered leads
+    Runner->>DB: Fetch unscored JobLeads (status=NEW)
+    DB-->>Runner: List of leads to score
+
+    loop For each unscored JobLead
+        Runner->>AI: match_job_to_profile(profile, lead.description)
+        activate AI
+        AI->>AI: Send prompt to LLMRouter (MatchResult schema)
+        AI-->>Runner: Return MatchResult (score, confidence, rationale)
+        deactivate AI
+        
+        alt Score >= min_match_score AND Confidence >= min_match_confidence
+            Runner->>DB: UPDATE JobLead status=MATCHED, score
+            Runner->>DB: INSERT Application record (status=MATCHED)
+        else Score is low
+            Runner->>DB: UPDATE JobLead status=LOW_MATCH, score
+        end
+    end
+
+    Runner->>DB: UPDATE PipelineJob status=COMPLETED, message="Finished"
+    deactivate Runner
+    deactivate Tasks
+```
+
+---
+
+## 3. Application Kit Tailoring & Grounding Verification
+
+This flow builds targeted resume data and cover letters while verifying claims against the candidate's original resume to eliminate hallucinations.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Operator (Browser)
+    participant Views as core.views.generate_kit
+    participant AI as core.ai_service (CareerAgentAI)
+    participant Tailor as core.resume_tailor (ResumeTailor)
+    participant DB as Database (SQLite)
+
+    User->>Views: POST /applications/{id}/generate/
+    activate Views
+    Views->>DB: Check profile readiness blockers
+    DB-->>Views: Ready (0 blockers)
+    Views->>DB: Fetch Application and associated JobLead
+    DB-->>Views: Application record details
+
+    Views->>AI: generate_application_kit(profile, lead)
+    activate AI
+    
+    AI->>Tailor: tailor_experience(experience_blocks, job_description)
+    activate Tailor
+    Tailor-->>AI: Tailored experience bullet points
+    deactivate Tailor
+
+    AI->>AI: Request Pydantic structured completion (ApplicationKit schema)
+    AI->>DB: Fetch candidate ProfileClaims (original verified facts)
+    DB-->>AI: List of claims (e.g. "Worked with Django", "Led team")
+    
+    AI->>AI: Run grounding check (validate_grounded_kit)
+    Note over AI: Verifies that statements in cover letter<br/>are backed by candidate ProfileClaims
+    
+    alt Verification fails (hallucination detected)
+        AI->>AI: Adjust prompt constraints and retry generation
+    end
+
+    AI-->>Views: Return validated ApplicationKit Pydantic Object
+    deactivate AI
+
+    Views->>DB: UPDATE Application status=KIT_READY, save kit JSON
+    Views-->>User: Redirect to application details view (/applications/{id}/)
+    deactivate Views
+```
+
+---
+
+## 4. Resilience & Circuit Breaker Logic
+
+This detail diagram shows how the system handles external LLM API outages using backoffs, cooldowns, and fallbacks.
+
+```mermaid
+flowchart TD
+    Request["1. Application initiates LLMRouter Request"] --> Budget{"2. Check daily limit?"}
+    
+    Budget -- Limit exceeded --> RaiseBudgetError["Raise Budget Limit Error"]
+    
+    Budget -- Within budget --> GetProvider["3. Select Primary Provider"]
+    
+    GetProvider --> CheckCircuit{"4. Is Provider Circuit Open?"}
+    
+    CheckCircuit -- Open (On Cooldown) --> NextProvider["5. Try Fallback Provider"]
+    NextProvider --> GetProvider
+    
+    CheckCircuit -- Closed (Healthy) --> CallAPI["6. Call Provider Endpoint"]
+    
+    CallAPI --> CheckSuccess{"7. API Call Successful?"}
+    
+    CheckSuccess -- Yes --> LogUsage["8. Log LLMUsageEvent & Return data"]
+    
+    CheckSuccess -- No (Exception) --> Classify["9. Classify Error (resilience.classify_error)"]
+    
+    Classify -- Transient (e.g. Timeout/503) --> RetryBackoff["10. Exponential Backoff Retry"]
+    RetryBackoff --> CallAPI
+    
+    Classify -- Non-Transient (e.g. Auth/Permanent) --> IncFail["11. Increment Provider Fail Count"]
+    
+    IncFail --> CheckMaxFail{"12. Fail count >= 5?"}
+    
+    CheckMaxFail -- Yes --> TripCircuit["13. Trip Circuit (Open Circuit for 300s)"]
+    TripCircuit --> NextProvider
+    
+    CheckMaxFail -- No --> NextProvider
+    
+    style CheckCircuit fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px
+    style CheckSuccess fill:#e1f5fe,stroke:#01579b,stroke-width:1px
+    style LogUsage fill:#d1c4e9,stroke:#512da8,stroke-width:1px
+    style TripCircuit fill:#ffebee,stroke:#c62828,stroke-width:2px
+```
+
+---
+
+## 5. Channel webhook entrypoint flow (Telegram/Discord)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Chat as Operator on Chat Platform
+    participant Webhook as Telegram/Discord API
+    participant View as core.views.webhook_receiver
+    participant Channel as core.channels (ChannelAdapter)
     participant Tasks as core.tasks
-    participant Discovery as core.discovery
-    participant Sources as source adapters
-    participant AI as CareerAgentAI
-    participant DB as Database
+    participant DB as Database (SQLite)
 
-    User->>Views: Start discovery or bulk score
-    Views->>Tasks: Enqueue tracked pipeline
-    Tasks->>Discovery: Resolve config and run adapters
-    Discovery->>Sources: Fetch raw jobs
-    Sources-->>Discovery: Raw job payloads
-    Discovery->>DB: Import normalized JobLead records
-    Tasks->>AI: Score unscored leads
-    AI-->>Tasks: MatchResult
-    Tasks->>DB: Update lead and create matched applications
-    Views-->>User: Queue and progress state
+    Chat->>Webhook: Send command: "/status" or "/discovery"
+    Webhook->>View: POST /webhooks/telegram/ or /webhooks/discord/
+    activate View
+    View->>DB: Query configuration details & allowlists
+    DB-->>View: Verified chat user is allowlisted
+
+    View->>Channel: parse_incoming_message(payload)
+    activate Channel
+    Channel->>Channel: Resolve command routing
+    
+    alt Command is /status
+        Channel->>DB: Fetch latest Application stats & usage
+        DB-->>Channel: Stats payload
+        Channel-->>View: Formatted text response
+    else Command is /discovery
+        Channel->>Tasks: Enqueue run_discovery_task (async)
+        Channel-->>View: Formatted message: "Started discovery task."
+    end
+    deactivate Channel
+
+    View-->>Webhook: Return HTTP 200 OK (Response text)
+    Webhook-->>Chat: Render bot response bubble
+    deactivate View
 ```
-
-Control points:
-
-- `archive_stale_leads` keeps old queue items from growing without review.
-- `assert_within_budget` protects against unexpected LLM spend.
-- `thresholds_for_candidate` controls lead and application status transitions.
-
-## Application Kit Flow
-
-```mermaid
-flowchart TB
-    ReadyProfile["Ready CandidateProfile"] --> Snapshot["Profile snapshot"]
-    MatchedLead["Matched JobLead"] --> Description["Job description"]
-    Snapshot --> Prompt["Application-kit prompt"]
-    Description --> Prompt
-    Prompt --> Router["LLMRouter"]
-    Router --> Kit["ApplicationKit schema"]
-    Kit --> Grounding["Grounding validation"]
-    Grounding --> Application["Application record"]
-    Application --> Review["Human review"]
-    Review --> Submitted["User marks submitted"]
-```
-
-Persistence:
-
-- `Application.profile_snapshot` preserves the candidate state used for generation.
-- `Application.generated_kit` stores structured generated material.
-- `Application.status` moves through matched, kit-ready, submitted, failed, or dismissed states.
-
-## Channel Command Flow
-
-```mermaid
-flowchart LR
-    Telegram["Telegram webhook"] --> View["Webhook view"]
-    Discord["Discord interaction"] --> View
-    View --> Adapter["Channel adapter"]
-    Adapter --> Command["Command handler"]
-    Command --> Domain["Queue, provider health, scoring, kit generation"]
-    Domain --> Event["NotificationEvent"]
-    Event --> Response["Channel response"]
-```
-
-Security controls:
-
-- Channel users and destinations must be allowlisted.
-- Secrets remain in environment variables.
-- Channel payloads should not be committed or pasted into public issues.
-
-## Error and Budget Flow
-
-```mermaid
-flowchart TB
-    Request["User or task request"] --> Cost["Estimate cost"]
-    Cost --> Budget{"Within daily budget?"}
-    Budget -- "No" --> Block["Raise budget error"]
-    Budget -- "Yes" --> Provider["Call provider"]
-    Provider --> Result{"Success?"}
-    Result -- "Yes" --> Record["Record usage metadata"]
-    Result -- "No" --> Classify["Classify error"]
-    Classify --> Cooldown["Cooldown or retry provider"]
-    Cooldown --> Fallback["Try next provider"]
-    Fallback --> Provider
-```
-
-The UI should show actionable errors without leaking credentials, raw provider payloads, or private prompt contents.
