@@ -62,8 +62,9 @@ def _generic_message(exc: Exception) -> str:
 
 
 def exception_http_status(exc: Exception) -> int:
-    if isinstance(exc, (ValueError, FileNotFoundError)):
-        return 400
     if isinstance(exc, (AIResponseError, LLMExhaustedError, KitValidationError)):
         return 502
+    if isinstance(exc, (ValueError, FileNotFoundError)):
+        return 400
     return 500
+
