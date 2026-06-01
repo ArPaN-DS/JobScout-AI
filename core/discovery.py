@@ -1,4 +1,4 @@
-"""Discovery pipeline: adapters  dedupe  JobLead  optional scoring."""
+"""Discovery pipeline: adapters → dedupe → JobLead → optional scoring."""
 
 from __future__ import annotations
 
