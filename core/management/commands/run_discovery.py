@@ -24,5 +24,5 @@ class Command(BaseCommand):
         for row in result.get("results", []):
             line = f"  {row['source_id']}: +{row['imported']} imported ({row['discovered']} found)"
             if row.get("error"):
-                line += f"  {row['error'][:80]}"
+                line += f" — {row['error'][:80]}"
             self.stdout.write(line)
