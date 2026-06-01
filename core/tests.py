@@ -595,3 +595,164 @@ class JobLeadThresholdTests(TestCase):
             thresholds=thresholds,
         )
         self.assertEqual(lead.status, JobLead.Status.LOW_MATCH)
+
+
+from .errors import format_user_error, exception_http_status
+from .ai_service import AIResponseError
+from .schemas import (
+    normalize_claim,
+    clean_text,
+    clean_list,
+    ExperienceItem,
+    JobPreferences,
+    MasterProfile,
+    MatchResult,
+    TailoredExperienceItem,
+    TailoredResume,
+    ApplicationKit,
+    KitCriticVerdict,
+    BaseJobExtraction,
+    validate_grounded_kit,
+)
+
+class ErrorsTests(TestCase):
+    def test_format_user_error_value_error(self):
+        exc = ValueError("Invalid input value")
+        payload = format_user_error(exc)
+        self.assertEqual(payload["code"], "ValueError")
+        self.assertEqual(payload["message"], "Invalid input value")
+        self.assertIn("Fix the input and try again.", payload["actions"])
+        self.assertFalse(payload["retryable"])
+
+    def test_format_user_error_llm_exhausted_error(self):
+        exc = LLMExhaustedError([])
+        payload = format_user_error(exc)
+        self.assertEqual(payload["code"], "LLMExhaustedError")
+        self.assertTrue(payload["retryable"])
+        self.assertTrue(payload["compact_retry"])
+        self.assertIn("Turn on Ollama with a local model.", payload["actions"])
+
+    def test_format_user_error_kit_validation_error(self):
+        exc = KitValidationError("Grounding check failed")
+        payload = format_user_error(exc)
+        self.assertEqual(payload["code"], "KitValidationError")
+        self.assertTrue(payload["retryable"])
+        self.assertIn("Review your profile claims and confirm skills.", payload["actions"])
+
+    def test_format_user_error_ai_response_error(self):
+        exc = AIResponseError("API Key invalid")
+        payload = format_user_error(exc)
+        self.assertEqual(payload["code"], "AIResponseError")
+        self.assertTrue(payload["retryable"])
+        self.assertIn("Check provider API keys in Provider Settings.", payload["actions"])
+
+    @override_settings(DEBUG=False)
+    def test_format_user_error_generic_production(self):
+        exc = RuntimeError("Internal db leak")
+        payload = format_user_error(exc)
+        self.assertNotIn("Internal db leak", payload["message"])
+        self.assertIn("An unexpected error occurred", payload["message"])
+        self.assertTrue(payload["retryable"])
+
+    @override_settings(DEBUG=True)
+    def test_format_user_error_generic_debug(self):
+        exc = RuntimeError("Internal db leak")
+        payload = format_user_error(exc)
+        self.assertIn("RuntimeError: Internal db leak", payload["message"])
+
+    def test_exception_http_status(self):
+        self.assertEqual(exception_http_status(ValueError("")), 400)
+        self.assertEqual(exception_http_status(FileNotFoundError("")), 400)
+        self.assertEqual(exception_http_status(AIResponseError("")), 502)
+        self.assertEqual(exception_http_status(LLMExhaustedError("")), 502)
+        self.assertEqual(exception_http_status(KitValidationError("")), 502)
+        self.assertEqual(exception_http_status(RuntimeError("")), 500)
+
+
+class SchemasTests(TestCase):
+    def test_clean_list_edge_cases(self):
+        self.assertEqual(clean_list(None), [])
+        self.assertEqual(clean_list("SingleItem"), ["SingleItem"])
+
+    def test_master_profile_clean_experience(self):
+        profile_dict = {
+            "name": "Alex",
+            "experience": None
+        }
+        profile = MasterProfile.model_validate(profile_dict)
+        self.assertEqual(profile.experience, [])
+
+        profile_dict_2 = {
+            "name": "Alex",
+            "experience": {
+                "company": "ACME",
+                "role": "Eng",
+                "duration": "1 yr",
+            }
+        }
+        profile_2 = MasterProfile.model_validate(profile_dict_2)
+        self.assertEqual(len(profile_2.experience), 1)
+        self.assertEqual(profile_2.experience[0].company, "ACME")
+
+    def test_tailored_resume_clean_experience(self):
+        resume_dict = {
+            "name": "Alex",
+            "skills": [],
+            "experience": None
+        }
+        resume = TailoredResume.model_validate(resume_dict)
+        self.assertEqual(resume.experience, [])
+
+        resume_dict_2 = {
+            "name": "Alex",
+            "skills": [],
+            "experience": {
+                "company": "ACME",
+                "role": "Eng",
+                "duration": "1 yr",
+            }
+        }
+        resume_2 = TailoredResume.model_validate(resume_dict_2)
+        self.assertEqual(len(resume_2.experience), 1)
+        self.assertEqual(resume_2.experience[0].company, "ACME")
+
+    def test_application_kit_clean_notes(self):
+        kit_dict = {
+            "tailored_resume": {
+                "name": "Alex",
+                "skills": [],
+                "experience": []
+            },
+            "cover_letter": "Letter",
+            "interview_prep_notes": "Note String"
+        }
+        kit = ApplicationKit.model_validate(kit_dict)
+        self.assertEqual(kit.interview_prep_notes, ["Note String"])
+
+    def test_base_job_extraction_clean_string(self):
+        job = BaseJobExtraction.model_validate({
+            "title": 12345,
+            "company": "ACME",
+        })
+        self.assertEqual(job.title, "12345")
+
+    def test_validate_grounded_kit_unsupported_experience(self):
+        profile = MasterProfile.model_validate(PROFILE_DATA)
+        kit = ApplicationKit.model_validate({
+            "tailored_resume": {
+                "name": "Alex Morgan",
+                "skills": ["Python"],
+                "experience": [
+                    {
+                        "company": "Fake Corp",
+                        "role": "CEO",
+                        "duration": "10 yrs"
+                    }
+                ]
+            },
+            "cover_letter": "I am interested."
+        })
+        with self.assertRaises(ValueError) as context:
+            validate_grounded_kit(profile, kit)
+        self.assertIn("unsupported experience entries", str(context.exception))
+
