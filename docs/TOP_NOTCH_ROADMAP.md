@@ -1,8 +1,8 @@
 # Top-Notch System Roadmap
 
-A phased plan to evolve **Job_bro_AI** from a strong local MVP into a reliable, measurable, production-grade career agent"without sacrificing the review-first, privacy-first principles that make it trustworthy.
+A phased plan to evolve **Job_bro_AI** from a strong local MVP into a reliable, measurable, production-grade career agent—without sacrificing the review-first, privacy-first principles that make it trustworthy.
 
-**North star:** *The best personal career agent you can self-host"high-quality kits, fresh relevant jobs, zero hallucinated claims, and clear proof that the workflow improves outcomes.*
+**North star:** *The best personal career agent you can self-host—high-quality kits, fresh relevant jobs, zero hallucinated claims, and clear proof that the workflow improves outcomes.*
 
 **Non-goals (stay disciplined):**
 - Fully unattended mass auto-submit to every ATS (legal, ethical, and reliability risk).
@@ -13,10 +13,10 @@ A phased plan to evolve **Job_bro_AI** from a strong local MVP into a reliable, 
 
 ## Guiding principles
 
-| Principle | What top notch means |
+| Principle | What “top notch” means |
 |-----------|-------------------------|
 | **Truthful AI** | Every skill in a kit traces to evidence; critic/validator blocks bad output. |
-| **Human in the loop** | Default path: discover ' score ' generate ' **review** ' submit. |
+| **Human in the loop** | Default path: discover → score → generate → **review** → submit. |
 | **Fail gracefully** | Scraping and LLMs fail often; users always get a clear next action. |
 | **Measurable** | Track funnel metrics locally so you can improve match thresholds and prompts. |
 | **Local-first** | Data stays on disk unless the user opts into sync/hosting. |
@@ -28,7 +28,7 @@ A phased plan to evolve **Job_bro_AI** from a strong local MVP into a reliable, 
 
 | Area | Today |
 |------|--------|
-| Core workflow | Profile ' match ' kit ' mark submitted |
+| Core workflow | Profile → match → kit → mark submitted |
 | LLM layer | Multi-provider router, fallback, cooldowns |
 | Discovery | JobSpy + manual import + management commands |
 | Tests | 16 unit tests (mostly mocked); manual `test_e2e.py` |
@@ -39,7 +39,7 @@ A phased plan to evolve **Job_bro_AI** from a strong local MVP into a reliable, 
 
 ## Target maturity model
 
-Use this ladder to decide when a phase is done.
+Use this ladder to decide when a phase is “done.”
 
 | Level | Discovery | AI quality | Reliability | Product |
 |-------|-----------|------------|-------------|---------|
@@ -52,7 +52,7 @@ Use this ladder to decide when a phase is done.
 
 ---
 
-## Phase 0 " Foundation cleanup (1"2 weeks)
+## Phase 0 — Foundation cleanup (1–2 weeks)
 
 *Unblock everything else. Low glamour, high leverage.*
 
@@ -60,33 +60,33 @@ Use this ladder to decide when a phase is done.
 
 - [ ] **Repo hygiene:** Ensure `job_finder_env/`, `job_finder/`, `db.sqlite3`, `.env`, `media/` never appear in git; document one canonical venv path in README.
 - [x] **Settings unification (partial):** CI runs `migrate` + `test` on `career_agent.settings`; deploy check still uses `deploy_settings`.
-- [ ] **Pin dependencies:** `requirements.txt` ' locked versions (`requirements.lock` or `pip-tools`); document Python 3.11.
-- [ ] **Split `core/views.py`:** Modules e.g. `views/profile.py`, `views/jobs.py`, `views/integrations.py`"same URLs, clearer ownership.
+- [ ] **Pin dependencies:** `requirements.txt` → locked versions (`requirements.lock` or `pip-tools`); document Python 3.11.
+- [ ] **Split `core/views.py`:** Modules e.g. `views/profile.py`, `views/jobs.py`, `views/integrations.py`—same URLs, clearer ownership.
 - [x] **Structured logging (partial):** `core/resilience.py` uses `logging`; `job_sources`/`auto_applier` still print.
 
 ### Success criteria
 
-- Fresh clone ' `pip install` ' `migrate` ' `test` green in &lt; 15 minutes.
+- Fresh clone → `pip install` → `migrate` → `test` green in &lt; 15 minutes.
 - No PII or secrets in `git status` on a dev machine.
 
 ---
 
-## Phase 1 " Quality & trust (2"4 weeks)
+## Phase 1 — Quality & trust (2–4 weeks)
 
-*What makes outputs top notch for hiring"not just AI generated.*
+*What makes outputs “top notch” for hiring—not just “AI generated.”*
 
 ### 1.1 Grounding & validation (harden)
 
-- [x] **Two-pass kit generation:** Generate ' deterministic grounding ' `CRITIC_VALIDATE` (opt-out via `KIT_CRITIC_ENABLED`).
+- [x] **Two-pass kit generation:** Generate → deterministic grounding → `CRITIC_VALIDATE` (opt-out via `KIT_CRITIC_ENABLED`).
 - [ ] **Claim-level citations:** Store `evidence_refs[]` per bullet in tailored experience (link to `ProfileClaim` or document snippet).
-- [ ] **User diff UI:** Side-by-side: original profile bullet vs tailored bullet; accept/reject per bullet before kit is ready.
+- [ ] **User diff UI:** Side-by-side: original profile bullet vs tailored bullet; accept/reject per bullet before kit is “ready.”
 - [x] **Prompt registry:** `core/prompts/registry.py` (`PROMPT_VERSION=1.0.0`); logged in `Application.ai_metadata`.
 
 ### 1.2 Match engine precision
 
 - [x] **Configurable thresholds:** `CandidatePreference.min_match_score` / `min_match_confidence` + env defaults.
-- [ ] **Explainable match card:** Show *why* score (matching skills, gaps, risk flags) in queue UI"already in model, polish presentation.
-- [x] **False positive capture (partial):** Not relevant dismisses leads (`dismiss_lead`); export for tuning still TODO.
+- [ ] **Explainable match card:** Show *why* score (matching skills, gaps, risk flags) in queue UI—already in model, polish presentation.
+- [x] **False positive capture (partial):** “Not relevant” dismisses leads (`dismiss_lead`); export for tuning still TODO.
 
 ### 1.3 Profile completeness score
 
@@ -100,7 +100,7 @@ Use this ladder to decide when a phase is done.
 
 ---
 
-## Phase 2 " Discovery pipeline that survives reality (3"6 weeks)
+## Phase 2 — Discovery pipeline that survives reality (3–6 weeks)
 
 *Finish v2 vision with realism: APIs first, scrape second.*
 
@@ -108,11 +108,11 @@ Use this ladder to decide when a phase is done.
 
 ```text
 Scheduler (django-q2 cron)
-    ' JobSourceRun (per source)
-        ' Adapters: jobspy | manual_import | rss/email (future)
-        ' normalize ' JobLead (dedupe fingerprint)
-        ' score_job_leads command
-        ' Queue (status: new | low_match | matched)
+    → JobSourceRun (per source)
+        → Adapters: jobspy | manual_import | rss/email (future)
+        → normalize → JobLead (dedupe fingerprint)
+        → score_job_leads command
+        → Queue (status: new | low_match | matched)
 ```
 
 - [x] **Adapter interface:** `core/sources/base.py` with `fetch()`, `health()`, `run()`.
@@ -145,7 +145,7 @@ Scheduler (django-q2 cron)
 
 ---
 
-## Phase 3 " Reliability & observability (2"3 weeks)
+## Phase 3 — Reliability & observability (2–3 weeks)
 
 *Top notch = predictable when things break.*
 
@@ -156,9 +156,9 @@ Scheduler (django-q2 cron)
 | Unit | 40+ tests: schemas, router, import dedupe, validators |
 | Integration | Management commands with fixtures; mock HTTP for jobspy |
 | E2E | CI job: Django live server + mocked `CareerAgentAI` (no real API keys) |
-| Manual | `test_e2e.py` with real keys"documented weekly smoke |
+| Manual | `test_e2e.py` with real keys—documented weekly smoke |
 
-- [x] **Coverage gate:** CI runs `coverage` 55% on core LLM/schemas/ai_service/errors/metrics (77%+ locally).
+- [x] **Coverage gate:** CI runs `coverage` ≥55% on core LLM/schemas/ai_service/errors/metrics (77%+ locally).
 - [x] **Regression fixtures:** `core/fixtures/golden_match.json` + snapshot test.
 
 ### 3.2 Background jobs
@@ -170,7 +170,7 @@ Scheduler (django-q2 cron)
 ### 3.3 Error UX
 
 - [x] **No raw tracebacks in UI** for production via `core/errors.py` + `error_detail` JSON.
-- [x] **Retry buttons:** Failed/matched apps " Retry kit + Compact retry (`LLM_COMPACT_MAX_CHARS`).
+- [x] **Retry buttons:** Failed/matched apps — Retry kit + Compact retry (`LLM_COMPACT_MAX_CHARS`).
 
 ### Success criteria
 
@@ -179,9 +179,9 @@ Scheduler (django-q2 cron)
 
 ---
 
-## Phase 4 " Security & deploy readiness (2"4 weeks)
+## Phase 4 — Security & deploy readiness (2–4 weeks)
 
-*Required before public or family sharing on a server.*
+*Required before “public” or family sharing on a server.*
 
 - [ ] **Authentication:** Django login + session; all workflow views protected.
 - [ ] **Optional multi-profile:** One user, multiple `CandidateProfile` records (job search personas).
@@ -193,11 +193,11 @@ Scheduler (django-q2 cron)
 ### Success criteria
 
 - OWASP-minded pass: no open admin, CSRF on, secure cookies, allowlists on bots.
-- Second user cannot read first users data (if multi-user added later).
+- Second user cannot read first user’s data (if multi-user added later).
 
 ---
 
-## Phase 5 " Outcomes & top notch product loop (ongoing)
+## Phase 5 — Outcomes & “top notch” product loop (ongoing)
 
 *Measure whether the system actually helps.*
 
@@ -208,10 +208,10 @@ Track in DB or SQLite views:
 | Metric | Why |
 |--------|-----|
 | Leads ingested / day | Discovery health |
-| Match rate  threshold | Filter tuning |
+| Match rate ≥ threshold | Filter tuning |
 | Kits generated / submitted | Funnel conversion |
-| Time profile ' first submit | Onboarding friction |
-| User-marked interview / offer | Outcome proxy |
+| Time profile → first submit | Onboarding friction |
+| User-marked “interview” / “offer” | Outcome proxy |
 | LLM cost / kit | Budget control |
 
 - [ ] **Dashboard card:** Last 30 days funnel.
@@ -219,17 +219,17 @@ Track in DB or SQLite views:
 
 ### 5.2 Continuous improvement
 
-- [ ] Monthly prompt review using false-positive / not relevant exports.
+- [ ] Monthly prompt review using false-positive / “not relevant” exports.
 - [ ] Provider benchmark script: same job, compare latency + score variance across providers.
-- [ ] User feedback field on each application: quality 1"5.
+- [ ] User feedback field on each application: “quality 1–5”.
 
 ### Success criteria
 
-- You can answer: Did match score  X correlate with interviews? from your own data within 90 days.
+- You can answer: “Did match score ≥ X correlate with interviews?” from your own data within 90 days.
 
 ---
 
-## Phase 6 " Optional excellence (pick selectively)
+## Phase 6 — Optional excellence (pick selectively)
 
 | Feature | Value | Cost |
 |---------|-------|------|
@@ -245,14 +245,14 @@ Track in DB or SQLite views:
 ## Priority matrix (what to do first)
 
 ```
-Impact '
-    "  P1 Grounding+validator     P2 Queue+digest
-    "  P0 Repo/settings/tests    P3 Observability
-    "  P4 Auth (if hosting)       P6 PDF export
-    """"""""""""""""""""""""""""""""""""' Effort
+Impact ↑
+    │  P1 Grounding+validator     P2 Queue+digest
+    │  P0 Repo/settings/tests    P3 Observability
+    │  P4 Auth (if hosting)       P6 PDF export
+    └──────────────────────────────────→ Effort
 ```
 
-**Recommended order:** Phase 0 ' 1 ' 3 (tests) in parallel with 2 ' 4 (if hosting) ' 5.
+**Recommended order:** Phase 0 → 1 → 3 (tests) in parallel with 2 → 4 (if hosting) → 5.
 
 ---
 
@@ -267,7 +267,7 @@ Impact '
 
 ---
 
-## Definition of top notch (checklist)
+## Definition of “top notch” (checklist)
 
 When all are true, the system is top notch **for its category** (local self-hosted agent):
 
@@ -277,7 +277,7 @@ When all are true, the system is top notch **for its category** (local self-host
 - [ ] Queue supports bulk prep with cost preview.
 - [ ] CI runs deploy checks + E2E without real API keys.
 - [ ] User sees actionable errors, never silent failures.
-- [ ] Funnel metrics exist: ingest ' match ' kit ' submit ' outcome.
+- [ ] Funnel metrics exist: ingest → match → kit → submit → outcome.
 - [ ] Public hosting only with auth + checklist complete.
 - [ ] Auto-submit remains off unless explicitly enabled with warnings.
 
@@ -297,10 +297,10 @@ When all are true, the system is top notch **for its category** (local self-host
 
 ## Related docs
 
-- `v2_planning_and_cost.md.resolved` " original Phase 2 feature list
-- `PUBLIC_LAUNCH_CHECKLIST.md` " hosting safety
-- `SECURITY.md` " threat model assumptions
-- `docs/ARCHITECTURE.md` " layer diagram to update as modules split
+- `v2_planning_and_cost.md.resolved` — original Phase 2 feature list
+- `PUBLIC_LAUNCH_CHECKLIST.md` — hosting safety
+- `SECURITY.md` — threat model assumptions
+- `docs/ARCHITECTURE.md` — layer diagram to update as modules split
 
 ---
 
