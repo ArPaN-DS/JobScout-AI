@@ -33,7 +33,7 @@ def score_unscored_leads(limit: int = 10, pipeline_job=None) -> int:
 
     for index, lead in enumerate(leads, start=1):
         if pipeline_job:
-            update_progress(pipeline_job, index - 1, f"Scoring {index}/{len(leads)}")
+            update_progress(pipeline_job, index - 1, f"Scoring {index}/{len(leads)}…")
         assert_within_budget(estimate_cost_from_metadata({}, "job_match"))
         ai = CareerAgentAI()
         match = ai.match_job_to_profile(profile, lead.description)
@@ -79,7 +79,7 @@ def bulk_generate_kits(top_n: int = 3, pipeline_job=None) -> dict:
 
     for index, lead in enumerate(leads, start=1):
         if pipeline_job:
-            update_progress(pipeline_job, index - 1, f"Generating kit {index}/{len(leads)}")
+            update_progress(pipeline_job, index - 1, f"Generating kit {index}/{len(leads)}…")
         application = lead.applications.filter(status=Application.Status.MATCHED).first()
         if not application:
             application = create_application_from_lead(lead, profile_snapshot=profile_data)
