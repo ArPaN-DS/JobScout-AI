@@ -1,178 +1,171 @@
-# Job_bro_AI
+# Job_bro_AI 🚀
 
-Job_bro_AI is a local-first AI career agent for discovering job leads, evaluating fit, preparing application kits, and tracking application progress. The default operating model is review-first: the system can research, score, draft, and organize, but the user remains responsible for reviewing and submitting applications.
+Welcome to **Job_bro_AI**! This is a self-hosted, local-first, privacy-centric AI career agent designed to help you discover job leads, evaluate your fit, auto-tailor application materials (resumes, cover letters, outreach messages), and track your pipeline.
 
-The project is designed for self-hosted use. It may process resumes, employment history, contact details, job preferences, private drafts, and LLM API keys, so public deployment requires deliberate security hardening.
+Our default mode of operation is **Review-First**: the system automates discovery, match-scoring, and kit preparation, but you remain in full control to review, edit, and click submit.
 
-## Current Capabilities
+---
 
-- Candidate profile intake from PDF or DOCX documents.
-- Evidence-backed profile claims with review and readiness checks.
-- Job discovery through adapter-based sources and manual import.
-- Match scoring with configurable thresholds and confidence handling.
-- Application kit generation, including resume content, cover letter, recruiter message, follow-up, and interview notes.
-- Provider routing across opt-in LLM providers with fallback, cooldowns, and budget tracking.
-- Pipeline jobs for discovery, scoring, and kit generation.
-- Web UI, Telegram webhook, and Discord interaction entry points.
-- Local metrics for funnel health, pipeline jobs, and LLM usage.
+## 🚀 Welcome, Freshers & New Contributors!
 
-## Safety Model
+If you are joining the project or picking up this work for the first time, this document is designed specifically for you. It explains how to get set up, how the modules interact, and how to verify that everything works correctly in under 15 minutes.
 
-Public defaults are intentionally conservative:
+---
 
-- No API provider is active without a user-owned key.
-- `AUTO_SUBMIT_ENABLED` defaults to `false`.
-- Uploaded files, local databases, generated profile data, and credentials are ignored by Git.
-- Telegram and Discord integrations require allowlists.
-- The app is intended for one local operator unless authentication, tenancy, and production hardening are added.
+## 🛠️ Prerequisites
 
-Before making a hosted instance public, read [SECURITY.md](SECURITY.md) and [PUBLIC_LAUNCH_CHECKLIST.md](PUBLIC_LAUNCH_CHECKLIST.md).
+Before you get started, make sure you have:
+1. **Python 3.11 or newer** installed.
+2. **pip** (Python package installer).
+3. **Git** configured on your local machine.
+4. An **LLM API Key** (e.g., Google Gemini, OpenAI, or Anthropic) OR a local **Ollama** installation for local offline inference.
 
-## Architecture
+---
 
-```mermaid
-flowchart TB
-    browser[Web UI] --> views[Django views]
-    telegram[Telegram webhook] --> channels[Channel adapters]
-    discord[Discord interactions] --> channels
-    channels --> views
+## ⚙️ Quick Start Installation Guide
 
-    views --> profile[Profile store and readiness]
-    views --> discovery[Discovery service]
-    views --> tasks[Pipeline tasks]
-    tasks --> discovery
-    tasks --> scorer[Match scoring]
-    tasks --> kits[Application kit generation]
+Follow these steps to get a local development instance running on your machine:
 
-    discovery --> sources[Job source adapters]
-    scorer --> ai[CareerAgentAI]
-    kits --> ai
-    profile --> ai
-    ai --> router[LLM router]
-    router --> providers[Gemini, OpenAI, Anthropic, Groq, OpenRouter, Ollama, others]
-
-    profile --> db[(SQLite or configured database)]
-    discovery --> db
-    scorer --> db
-    kits --> db
-    tasks --> db
-```
-
-Main modules:
-
-- `career_agent/` contains Django settings, deployment settings, and root URL routing.
-- `core/models.py` defines candidate profiles, evidence, job leads, applications, pipeline jobs, notifications, and LLM usage events.
-- `core/views.py` coordinates web requests and JSON endpoints.
-- `core/ai_service.py`, `core/llm.py`, and `core/prompts/` handle AI orchestration, provider routing, and prompt construction.
-- `core/discovery.py`, `core/sources/`, and `core/job_sources.py` handle job discovery and ingestion.
-- `core/tasks.py` and `core/job_runner.py` run tracked discovery, scoring, and kit-generation jobs.
-
-## Data Pipeline
-
-```mermaid
-flowchart LR
-    intake[Resume, links, preferences] --> extract[Parse and extract profile]
-    extract --> claims[Evidence claims]
-    claims --> review[Human review]
-    review --> ready[Ready candidate profile]
-    ready --> discover[Discover or import job leads]
-    discover --> dedupe[Dedupe and normalize]
-    dedupe --> score[Score match]
-    score --> queue[Review queue]
-    queue --> kit[Generate application kit]
-    kit --> submit[Human submits]
-    submit --> track[Track outcome]
-```
-
-Sensitive data lifecycle:
-
-- Resume uploads are temporary inputs and must not be committed.
-- Profile data is stored locally in the configured database.
-- LLM prompts may include candidate and job data; only enable providers you trust for the data being processed.
-- Application drafts are treated as private user data.
-
-## Quick Start
-
-Prerequisites:
-
-- Python 3.11 or newer
-- `pip`
-- At least one LLM provider key, or local Ollama if you want offline inference
-
-Setup:
-
-```powershell
+### 1. Clone the Repository
+```bash
 git clone https://github.com/ArPaN-DS/Job_bro_AI.git
 cd Job_bro_AI
-python -m venv job_finder_env
-.\job_finder_env\Scripts\activate
+```
+
+### 2. Set Up a Virtual Environment
+A virtual environment isolates this project's dependencies from your global python setup.
+
+*   **On Windows (Powershell / CMD):**
+    ```powershell
+    python -m venv job_finder_env
+    .\job_finder_env\Scripts\activate
+    ```
+*   **On macOS/Linux:**
+    ```bash
+    python3 -m venv job_finder_env
+    source job_finder_env/bin/activate
+    ```
+
+### 3. Install Dependencies
+```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
+```
+
+### 4. Create local environment settings
+Copy the template `.env.example` file to `.env`:
+```bash
+# Windows (Powershell / CMD):
 copy .env.example .env
-python manage.py migrate
-python manage.py runserver
+
+# macOS/Linux:
+cp .env.example .env
 ```
 
-Open `http://127.0.0.1:8000`.
-
-Minimum `.env` values:
-
+Open the newly created `.env` file in your editor. At a minimum, set:
 ```env
-DJANGO_SECRET_KEY=replace-with-a-long-random-secret
 DJANGO_DEBUG=true
-DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
-CSRF_TRUSTED_ORIGINS=http://127.0.0.1:8000,http://localhost:8000
+DJANGO_SECRET_KEY=replace-this-with-a-long-random-secret-key-at-least-50-chars
+GEMINI_API_KEY=your-actual-api-key-here
+```
+*(You can get a free-tier Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).)*
 
-GEMINI_API_KEY=
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-OLLAMA_ENABLED=false
-AUTO_SUBMIT_ENABLED=false
+### 5. Initialize the Database
+Run migrations to set up the local SQLite database (`db.sqlite3`):
+```bash
+python manage.py migrate
 ```
 
-## Verification
-
-Run these before committing or deploying:
-
-```powershell
-python manage.py check
-python manage.py test core
-$env:DJANGO_SETTINGS_MODULE="career_agent.deploy_settings"
-python manage.py check --deploy
+### 6. Create an Admin User (Optional)
+To access the Django Admin Console to view database tables directly:
+```bash
+python manage.py createsuperuser
 ```
 
-The CI workflow runs Django checks, migrations, tests, and a focused coverage gate on Windows and Ubuntu.
+### 7. Run the Web Server and Background Workers
+Because Job_bro_AI runs background AI scoring tasks, you need to run **two** terminals side-by-side:
 
-## Documentation
+*   **Terminal 1: Web Interface Server**
+    ```bash
+    # Activate virtual environment first
+    python manage.py runserver
+    ```
+*   **Terminal 2: Background Task Worker (django-q2)**
+    ```bash
+    # Activate virtual environment first
+    python manage.py qcluster
+    ```
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Data pipeline](docs/DATA_PIPELINE.md)
-- [Data flow](docs/DATA_FLOW.md)
-- [Setup guide](docs/SETUP_GUIDE.md)
-- [User guide](docs/USER_GUIDE.md)
-- [API and module reference](docs/API_REFERENCE.md)
-- [Supported sources](docs/SUPPORTED_SOURCES.md)
-- [E2E testing](docs/E2E_TESTING.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Deployment](docs/DEPLOYMENT.md)
-- [Roadmap](docs/TOP_NOTCH_ROADMAP.md)
+Open your browser and navigate to `http://127.0.0.1:8000/`. You should see the welcome interface!
 
-## Public Repository Hygiene
+---
 
-Do not commit:
+## 📂 Core Folder Structure
 
-- `.env` or provider credentials
-- SQLite databases
-- uploaded resumes or generated application drafts
-- personal profile JSON files
-- screenshots that contain private candidate or application data
-- local virtual environments
+A quick guide to finding your way around the codebase:
 
-Use `.env.example` for configuration examples and keep real values outside the repository.
+-   [`career_agent/`](file:///d:/Job_finder_AI/career_agent/): Django project settings, deployment rules, and root URL routing.
+-   [`core/`](file:///d:/Job_finder_AI/core/): Main application folder.
+    -   [`core/models.py`](file:///d:/Job_finder_AI/core/models.py): Defines the database schema (Job leads, Candidate profiles, applications, LLM logs).
+    -   [`core/views.py`](file:///d:/Job_finder_AI/core/views.py): Handles URL requests and renders dashboard views.
+    -   [`core/ai_service.py`](file:///d:/Job_finder_AI/core/ai_service.py): High-level career agent AI orchestration.
+    -   [`core/llm.py`](file:///d:/Job_finder_AI/core/llm.py): Low-level LLM router (handles API keys, providers, and circuit breakers).
+    -   [`core/tasks.py`](file:///d:/Job_finder_AI/core/tasks.py): Background worker tasks.
+    -   [`core/sources/`](file:///d:/Job_finder_AI/core/sources/): Modules scraping or fetching jobs from job boards.
+-   [`templates/`](file:///d:/Job_finder_AI/templates/): HTML5 templates for views.
+-   [`static/`](file:///d:/Job_finder_AI/static/): CSS styling, icons, and client-side JavaScript.
 
-## Contributing
+---
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Keep changes review-first, privacy-first, and covered by focused tests where behavior changes.
+## 📚 Deep-Dive Documentation Index
 
-## License
+To understand the internal subsystems in detail, please consult these manuals:
 
-MIT License. See [LICENSE](LICENSE).
+1.  **[System Architecture Guide](docs/ARCHITECTURE.md)**: Explains the MVT architecture, sequence request flows, and extension patterns.
+2.  **[Data Pipeline Documentation](docs/DATA_PIPELINE.md)**: Details document extraction, Pydantic validation schemas, and deduplication.
+3.  **[Detailed Runtime Data Flows](docs/DATA_FLOW.md)**: Sequence diagrams mapping exactly how variables and responses move through the code.
+4.  **[Supported Discovery Sources](docs/SUPPORTED_SOURCES.md)**: Details the active job search feeds and how to configure them.
+5.  **[E2E and Integration Testing Manual](docs/E2E_TESTING.md)**: Instructions on running local test suites.
+6.  **[Setup Guide & Troubleshooting](docs/SETUP_GUIDE.md)**: Resolving common installation errors.
+7.  **[User Guide & Playbook](docs/USER_GUIDE.md)**: How to make the best use of the application features.
+8.  **[Deployment Playbook](docs/DEPLOYMENT.md)**: How to host the application securely in production.
+9.  **[Feature Roadmap](docs/TOP_NOTCH_ROADMAP.md)**: Future milestones and priorities.
+
+---
+
+## 🧪 Verification & Local Testing
+
+Before pushing any changes to Git, always run the test suite to ensure nothing is broken.
+
+1.  **Check Django Settings Integrity:**
+    ```bash
+    python manage.py check
+    ```
+2.  **Run Django Automated Unit and Workflow Tests:**
+    ```bash
+    python manage.py test
+    ```
+3.  **Check Production Settings Security Defaults:**
+    ```bash
+    # On Windows:
+    $env:DJANGO_SETTINGS_MODULE="career_agent.deploy_settings"
+    python manage.py check --deploy
+    ```
+
+---
+
+## 🔒 Public Repository Hygiene
+
+To keep your private information secure, the `.gitignore` is configured to prevent committing sensitive files. Never disable these ignores or commit:
+-   Your `.env` file (contains raw API keys).
+-   Your local database file `db.sqlite3`.
+-   Uploaded resume documents or generated PDF application drafts under `tmp_uploads/`.
+-   Personal metadata profile exports.
+
+Keep `.env.example` updated with mock placeholders when adding new environment configurations.
+
+---
+
+## 🤝 Contributing
+
+We welcome your ideas! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for style conventions, test coverage thresholds, and pull request procedures.
