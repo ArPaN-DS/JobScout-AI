@@ -53,7 +53,7 @@
     if (!data.success || !statusLine) return;
     const q = data.queue || {};
     statusLine.textContent =
-      `Queue: ${q.total || 0} leads  ${q.matched || 0} matched, ${q.new || 0} new. ` +
+      `Queue: ${q.total || 0} leads — ${q.matched || 0} matched, ${q.new || 0} new. ` +
       `Last poll: ${new Date().toLocaleTimeString()}`;
     renderPipeline(data.pipeline_jobs, data.budget);
   }
@@ -65,7 +65,7 @@
   document.getElementById("btn-run-discovery")?.addEventListener("click", async () => {
     const btn = document.getElementById("btn-run-discovery");
     btn.disabled = true;
-    showMessage("Discovery running this may take several minutes.", false);
+    showMessage("Discovery running… this may take several minutes.", false);
     try {
       const body = new URLSearchParams({ score_limit: "20" });
       const data = await postForm("/jobs/discover/", body);
@@ -91,7 +91,7 @@
       event.preventDefault();
       const body = new FormData(form);
       try {
-        showMessage("Working", false);
+        showMessage("Working…", false);
         const data = await postForm(form.action, body);
         if (data.result?.scored !== undefined) {
           showMessage(`Scored ${data.result.scored} lead(s).`, false);
