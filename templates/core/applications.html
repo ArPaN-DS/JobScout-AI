@@ -42,17 +42,17 @@
                 <tr>
                     <td>
                         {% if app.status == 'auto_applied' %}
-                        <span class="status-pill" style="background:#e8f7ef; color:#16835f;"> Auto Applied</span>
+                        <span class="status-pill" style="background:#e8f7ef; color:#16835f;">🟢 Auto Applied</span>
                         {% elif app.status == 'manual_required' %}
-                        <span class="status-pill" style="background:#fff4e5; color:#a16207;"> Manual Required</span>
+                        <span class="status-pill" style="background:#fff4e5; color:#a16207;">⚠️ Manual Required</span>
                         {% elif app.status == 'matched' %}
-                        <span class="status-pill" style="background:#eff6ff; color:#1d478c;">Matched</span>
+                        <span class="status-pill" style="background:#eff6ff; color:#1d478c;">🎯 Matched</span>
                         {% elif app.status == 'kit_generated' %}
-                        <span class="status-pill" style="background:#f5f3ff; color:#6d28d9;">Kit Ready</span>
+                        <span class="status-pill" style="background:#f5f3ff; color:#6d28d9;">📄 Kit Ready</span>
                         {% elif app.status == 'submitted' %}
-                        <span class="status-pill success">Submitted</span>
+                        <span class="status-pill success">✅ Submitted</span>
                         {% elif app.status == 'failed' %}
-                        <span class="status-pill" style="background:#fff1f0; color:#b42318;"> Failed</span>
+                        <span class="status-pill" style="background:#fff1f0; color:#b42318;">❌ Failed</span>
                         {% elif app.status == 'low_match' %}
                         <span class="status-pill neutral">Low Match</span>
                         {% elif app.status == 'scraped' %}
@@ -63,10 +63,10 @@
                     </td>
                     <td>
                         {% if app.source_lead %}
-                        <strong style="display: block; font-size: 0.9rem;">{{ app.source_lead.title|default:""|truncatechars:40 }}</strong>
-                        <span style="color: var(--muted); font-size: 0.82rem;">{{ app.source_lead.company|default:"" }}</span>
+                        <strong style="display: block; font-size: 0.9rem;">{{ app.source_lead.title|default:"—"|truncatechars:40 }}</strong>
+                        <span style="color: var(--muted); font-size: 0.82rem;">{{ app.source_lead.company|default:"—" }}</span>
                         {% if app.source_lead.location %}
-                        <span style="display: block; color: var(--muted); font-size: 0.78rem;"> {{ app.source_lead.location }}</span>
+                        <span style="display: block; color: var(--muted); font-size: 0.78rem;">📍 {{ app.source_lead.location }}</span>
                         {% endif %}
                         {% else %}
                         <span style="color: var(--muted); font-size: 0.85rem;">{{ app.job_url|truncatechars:50|default:"Manual" }}</span>
@@ -78,7 +78,7 @@
                             {{ app.match_score }}%
                         </span>
                         {% else %}
-                        <span style="color: var(--muted);"></span>
+                        <span style="color: var(--muted);">—</span>
                         {% endif %}
                     </td>
                     <td style="max-width: 280px;">
@@ -95,10 +95,10 @@
                            target="_blank"
                            class="btn btn-secondary"
                            style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
-                            Download PDF
+                            📄 Download PDF
                         </a>
                         {% else %}
-                        <span style="color: var(--muted); font-size: 0.82rem;"></span>
+                        <span style="color: var(--muted); font-size: 0.82rem;">—</span>
                         {% endif %}
                     </td>
                     <td>
@@ -107,25 +107,25 @@
                            target="_blank"
                            class="btn btn-secondary"
                            style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
-                            - View
+                            🖼 View
                         </a>
                         {% else %}
-                        <span style="color: var(--muted); font-size: 0.82rem;"></span>
+                        <span style="color: var(--muted); font-size: 0.82rem;">—</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if app.job_url %}
                         <a href="{{ app.job_url }}" target="_blank" class="btn btn-secondary"
                            style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
-                            - Open
+                            🔗 Open
                         </a>
                         {% elif app.source_lead and app.source_lead.job_url %}
                         <a href="{{ app.source_lead.job_url }}" target="_blank" class="btn btn-secondary"
                            style="min-height: 30px; padding: 4px 10px; font-size: 0.8rem; font-weight: 700;">
-                            - Open
+                            🔗 Open
                         </a>
                         {% else %}
-                        <span style="color: var(--muted); font-size: 0.82rem;"></span>
+                        <span style="color: var(--muted); font-size: 0.82rem;">—</span>
                         {% endif %}
                     </td>
                     <td style="white-space: nowrap; color: var(--muted); font-size: 0.82rem;">
@@ -140,13 +140,13 @@
                             <button type="submit" class="btn btn-primary btn-sm">{% if app.status == 'failed' %}Retry kit{% else %}Generate kit{% endif %}</button>
                             <button type="submit" name="compact" value="1" class="btn btn-secondary btn-sm">Compact retry</button>
                         </form>
-                        {% else %}{% endif %}
+                        {% else %}—{% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
                     <td colspan="9" style="text-align: center; padding: 36px; color: var(--muted);">
-                        <div style="font-size: 2rem; margin-bottom: 10px;"></div>
+                        <div style="font-size: 2rem; margin-bottom: 10px;">📭</div>
                         No applications tracked yet. Run the job finder to start collecting matches.
                     </td>
                 </tr>
