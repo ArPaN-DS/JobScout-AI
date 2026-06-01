@@ -15,7 +15,7 @@
         </span>
     </div>
     <p class="muted">Remaining today: <strong>${{ budget.remaining_usd }}</strong>
-        {% if budget.warning %}  approaching daily limit{% endif %}
+        {% if budget.warning %} — approaching daily limit{% endif %}
     </p>
 </section>
 
@@ -46,8 +46,8 @@
         </div>
     </div>
     <p class="muted mt-4">
-        Discovery runs (7d): {{ funnel.discovery_runs_7d }} 
-        Failed apps (7d): {{ funnel.failed_applications_7d }} 
+        Discovery runs (7d): {{ funnel.discovery_runs_7d }} ·
+        Failed apps (7d): {{ funnel.failed_applications_7d }} ·
         LLM events (24h): {{ funnel.llm_events_24h }}
     </p>
 </section>
@@ -73,7 +73,7 @@
                     <td>{{ job.kind }}</td>
                     <td>{{ job.status }}</td>
                     <td>{{ job.progress_current }}/{{ job.progress_total }}</td>
-                    <td>{{ job.message|default:"" }}</td>
+                    <td>{{ job.message|default:"—" }}</td>
                     <td>
                         {% if job.status == 'running' %}
                         <form method="post" action="{% url 'cancel_pipeline_job' job.id %}" style="display:inline;">
