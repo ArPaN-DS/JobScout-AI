@@ -25,7 +25,7 @@
     </ul>
     {% if match_thresholds %}
     <p class="muted mt-4">
-        Match bar: score  {{ match_thresholds.min_match_score }} and confidence  {{ match_thresholds.min_match_confidence }}.
+        Match bar: score ≥ {{ match_thresholds.min_match_score }} and confidence ≥ {{ match_thresholds.min_match_confidence }}.
         <a href="{% url 'onboarding_preferences' %}">Adjust in preferences</a>.
     </p>
     {% endif %}
