@@ -23,6 +23,8 @@ class ErrorType(Enum):
     AUTH_REQUIRED = "auth_required"  # Login wall, 401 → try auto-login
     BOT_BLOCKED = "bot_blocked"     # CAPTCHA, Cloudflare → screenshot + skip
     PERMANENT = "permanent"         # 404, structure changed → log + skip
+    API_KEY_INVALID = "api_key_invalid"  # Invalid LLM API key
+    CONTEXT_LIMIT_EXCEEDED = "context_limit_exceeded" # Prompt exceeds context length
     UNKNOWN = "unknown"
 
 
@@ -41,15 +43,25 @@ def classify_error(error: Exception = None, status_code: int = None, page_conten
     # Check status codes
     if status_code:
         if status_code in (401, 403):
+            # Check if this is an API key error vs login wall
+            if error and any(kw in str(error).lower() for kw in ["api key", "key", "provider", "token"]):
+                return ErrorType.API_KEY_INVALID
             return ErrorType.AUTH_REQUIRED
         if status_code in (429, 500, 502, 503, 504):
             return ErrorType.TRANSIENT
+        if status_code in (400,):
+            if error and any(kw in str(error).lower() for kw in ["context", "token", "limit", "length", "too long"]):
+                return ErrorType.CONTEXT_LIMIT_EXCEEDED
         if status_code in (404, 410):
             return ErrorType.PERMANENT
 
     # Check exception types
     if error:
         error_str = str(error).lower()
+        if any(kw in error_str for kw in ["context length exceeded", "too many tokens", "token limit", "max_tokens", "context window"]):
+            return ErrorType.CONTEXT_LIMIT_EXCEEDED
+        if any(kw in error_str for kw in ["api key", "invalid key", "unauthorized", "api_key", "credentials", "permission_denied"]):
+            return ErrorType.API_KEY_INVALID
         if any(kw in error_str for kw in ["timeout", "timed out", "connection reset", "connection refused",
                                            "temporary", "retry", "too many requests"]):
             return ErrorType.TRANSIENT
