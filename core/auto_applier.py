@@ -10,6 +10,7 @@ from playwright_stealth import Stealth
 from django.conf import settings
 from .llm import LLMRouter, LLMRequest, LLMTask
 from .resilience import classify_error, ErrorType, screenshot_on_failure
+from .schemas import normalize_claim
 
 # 
 # VIEWPORTS & USER AGENTS FOR AUTHENTICITY
@@ -282,94 +283,212 @@ async def extract_form_fields(page: Page) -> List[Dict[str, Any]]:
 
 
 async def smart_fill_form(fields: List[Dict[str, Any]], profile: Dict[str, Any]) -> Dict[str, Any]:
-    """Uses LLMRouter to map profile claims and form inputs intelligently with zero-prompt fallback."""
+    """
+    Smart-fills form fields:
+    1. For common personal details, uses basic heuristics.
+    2. For custom/recruiter questions, queries the local CandidateQuestionAnswer DB table.
+    3. If not found, uses LLMRouter to dynamically draft an answer, and saves it as unverified.
+    """
     if not fields:
         return {}
 
-    field_descriptions = []
-    for f in fields:
-        desc = f"- Field: name='{f['name']}', label='{f['label']}', type='{f['type']}'"
-        if f.get("options"):
-            opts = [o["text"] for o in f["options"][:6]]
-            desc += f", options={opts}"
-        if f.get("placeholder"):
-            desc += f", placeholder='{f['placeholder']}'"
-        if f.get("required"):
-            desc += " (REQUIRED)"
-        field_descriptions.append(desc)
+    # Get active profile and existing Q&As from database
+    try:
+        from asgiref.sync import sync_to_async
+        @sync_to_async
+        def get_db_data():
+            from .models import CandidateProfile, CandidateQuestionAnswer
+            profile_db = CandidateProfile.active()
+            qa_items = list(CandidateQuestionAnswer.objects.filter(profile=profile_db)) if profile_db else []
+            return profile_db, qa_items
+        profile_db, qa_items = await get_db_data()
+    except Exception as exc:
+        print(f"  [Q&AMemory] Database access failed: {exc}")
+        qa_items = []
+        profile_db = None
 
-    prompt = f"""You are filling out a job application form. Map the candidate's profile data to the form fields.
+    # Helper to calculate Jaccard word similarity between normalized texts
+    def calculate_similarity(s1: str, s2: str) -> float:
+        w1 = set(normalize_claim(s1).split())
+        w2 = set(normalize_claim(s2).split())
+        if not w1 or not w2:
+            return 0.0
+        return len(w1.intersection(w2)) / len(w1.union(w2))
+
+    mapping = {}
+    custom_questions_to_draft = []
+
+    # First pass: identify common fields and check DB for custom questions
+    for f in fields:
+        label = f.get("label") or ""
+        name = f.get("name") or ""
+        placeholder = f.get("placeholder") or ""
+        key = f.get("name") or f.get("id")
+        if not key:
+            continue
+
+        label_lower = (name + " " + label + " " + placeholder).lower()
+        
+        # 1. Skip files/resumes (handled separately in auto-applier)
+        if f.get("type") == "file":
+            continue
+
+        # 2. Check for common personal fields (heuristics are extremely reliable for these)
+        is_common = False
+        if "full name" in label_lower or "fullname" in label_lower or "complete name" in label_lower:
+            mapping[key] = profile.get("name", "")
+            is_common = True
+        elif "first" in label_lower or "fname" in label_lower or "given name" in label_lower:
+            mapping[key] = profile.get("name", "").split()[0] if profile.get("name") else ""
+            is_common = True
+        elif "last" in label_lower or "lname" in label_lower or "surname" in label_lower or "family name" in label_lower:
+            parts = profile.get("name", "").split()
+            mapping[key] = parts[-1] if len(parts) > 1 else ""
+            is_common = True
+        elif "name" in label_lower and not any(w in label_lower for w in ["company", "college", "school", "ref", "referral"]):
+            mapping[key] = profile.get("name", "")
+            is_common = True
+        elif "email" in label_lower:
+            mapping[key] = profile.get("email", "")
+            is_common = True
+        elif "phone" in label_lower or "mobile" in label_lower or "tel" in label_lower:
+            mapping[key] = profile.get("phone", "")
+            is_common = True
+        elif "linkedin" in label_lower:
+            mapping[key] = profile.get("linkedin_url", "")
+            is_common = True
+        elif "github" in label_lower:
+            mapping[key] = profile.get("github_url", "")
+            is_common = True
+
+        if is_common:
+            continue
+
+        # 3. For custom questions, try to find a match in the Q&A memory database
+        best_match = None
+        best_score = 0.0
+        
+        for qa in qa_items:
+            # Match against label and placeholder
+            score_label = calculate_similarity(label, qa.question_text)
+            score_placeholder = calculate_similarity(placeholder, qa.question_text) if placeholder else 0.0
+            score = max(score_label, score_placeholder)
+            
+            # Prefer verified answers, give them a minor boost
+            if qa.is_verified:
+                score += 0.05
+                
+            if score > best_score:
+                best_score = score
+                best_match = qa
+
+        # Re-verify threshold ( Jaccard word similarity >= 0.35 )
+        if best_match and best_score >= 0.35:
+            mapping[key] = best_match.answer_text
+            print(f"  [Q&AMemory] matched field '{label[:30]}' to database question '{best_match.question_text[:30]}' (Score: {best_score:.2f})")
+        else:
+            # We need to draft this custom question via the LLM
+            if f.get("tag") == "textarea" or (f.get("tag") == "input" and f.get("type") in ("text", "search")):
+                custom_questions_to_draft.append(f)
+
+    # If we have custom questions to draft, do it in a single LLM call to save tokens and latency
+    if custom_questions_to_draft:
+        field_descriptions = []
+        for f in custom_questions_to_draft:
+            desc = f"- Field name/id='{f.get('name') or f.get('id')}', label='{f.get('label', '')}', placeholder='{f.get('placeholder', '')}'"
+            if f.get("options"):
+                opts = [o["text"] for o in f["options"][:6]]
+                desc += f", options={opts}"
+            field_descriptions.append(desc)
+
+        prompt = f"""You are filling out a job application form. Draft answers for the candidate's custom/recruiter fields.
 
 CANDIDATE PROFILE:
 - Full Name: {profile.get('name', 'Candidate Name')}
-- Email: {profile.get('email', '')}
-- Phone: {profile.get('phone', '')}
-- Location: {profile.get('location', '')}
 - Target Roles: {profile.get('target_roles', [])}
 - Skills: {profile.get('skills', [])}
 - Experience: {profile.get('experience', [])}
-- LinkedIn: {profile.get('linkedin_url', '')}
-- GitHub: {profile.get('github_url', '')}
-- Work Authorization: {profile.get('visa_status', '')}
+- Visa Status/Work Authorization: {profile.get('visa_status', '')}
 
-FORM FIELDS:
+CUSTOM FORM FIELDS TO FILL:
 {chr(10).join(field_descriptions)}
 
-Return ONLY a valid JSON object mapping the field 'name' (or 'id' if name is empty) to the value to fill.
-For select/dropdown fields, return the exact option value or option text matching the candidate profile.
-For checkbox/radio buttons, return a boolean (true/false) or the option string.
-IMPORTANT: Return ONLY the JSON, no markdown, no explanation."""
+Draft professional, highly tailored, and truthful answers based ONLY on the candidate profile. Do not invent details.
+Return ONLY a valid JSON object mapping the field name/id to the drafted answer string.
+IMPORTANT: Return ONLY raw JSON, no markdown formatting (no ```json)."""
 
-    try:
-        router = LLMRouter()
-        result = router.generate(
-            LLMRequest(
-                task=LLMTask.CRITIC_VALIDATE,
-                prompt=prompt,
-                temperature=0.1,
-                response_mime_type="application/json"
+        try:
+            router = LLMRouter()
+            result = router.generate(
+                LLMRequest(
+                    task=LLMTask.CRITIC_VALIDATE,
+                    prompt=prompt,
+                    temperature=0.2,
+                    response_mime_type="application/json"
+                )
             )
-        )
-        text = result.text.strip()
-        
-        # Clean JSON markdown if any
-        if text.startswith("```json"):
-            text = text[7:]
-        elif text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
+            text = result.text.strip()
+            
+            # Clean JSON markdown if present
+            if text.startswith("```json"):
+                text = text[7:]
+            elif text.startswith("```"):
+                text = text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
 
-        mapping = json.loads(text)
-        print(f"  LLM mapped {len(mapping)} fields dynamically.")
-        return mapping
-    except Exception as e:
-        print(f"  LLM smart fill failed: {e}. Falling back to basic heuristics.")
+            drafted_answers = json.loads(text)
+            
+            # Update mapping and persist the drafted answers to the Q&A memory database
+            for f in custom_questions_to_draft:
+                key = f.get("name") or f.get("id")
+                drafted_val = drafted_answers.get(key)
+                if drafted_val:
+                    mapping[key] = drafted_val
+                    
+                    # Save as unverified draft
+                    if profile_db:
+                        try:
+                            label_val = f.get("label") or ""
+                            placeholder_val = f.get("placeholder") or ""
+                            norm_q = normalize_claim(label_val or placeholder_val or key)
+                            if norm_q:
+                                from asgiref.sync import sync_to_async
+                                @sync_to_async
+                                def save_item(p, nq, q_text, ans):
+                                    from .models import CandidateQuestionAnswer
+                                    CandidateQuestionAnswer.objects.update_or_create(
+                                        profile=p,
+                                        normalized_question=nq[:260],
+                                        defaults={
+                                            "question_text": q_text,
+                                            "answer_text": ans,
+                                            "category": "draft",
+                                            "is_verified": False
+                                        }
+                                    )
+                                await save_item(profile_db, norm_q, label_val or placeholder_val or key, drafted_val)
+                        except Exception as save_exc:
+                            print(f"     Failed to save drafted Q&A to database: {save_exc}")
+            
+            print(f"  [Q&AMemory] LLM drafted {len(custom_questions_to_draft)} custom fields and saved to DB.")
+        except Exception as e:
+            print(f"  [Q&AMemory] LLM custom drafting failed: {e}")
+            
+    # For any fields still unmapped, fallback to basic heuristics
+    for f in fields:
+        key = f.get("name") or f.get("id")
+        if not key or key in mapping:
+            continue
         
-        # Fallback basic heuristics
-        mapping = {}
-        for f in fields:
-            label = (f["name"] + f["label"] + f["placeholder"]).lower()
-            key = f["name"] or f["id"]
-            if not key:
-                continue
-            if "first" in label or "fname" in label:
-                mapping[key] = profile.get("name", "").split()[0] if profile.get("name") else ""
-            elif "last" in label or "lname" in label:
-                parts = profile.get("name", "").split()
-                mapping[key] = parts[-1] if len(parts) > 1 else ""
-            elif "name" in label:
-                mapping[key] = profile.get("name", "")
-            elif "email" in label:
-                mapping[key] = profile.get("email", "")
-            elif "phone" in label or "mobile" in label or "tel" in label:
-                mapping[key] = profile.get("phone", "")
-            elif "linkedin" in label:
-                mapping[key] = profile.get("linkedin_url", "")
-            elif "github" in label:
-                mapping[key] = profile.get("github_url", "")
-        return mapping
+        # If it's a select field, default to the first non-empty option
+        if f.get("tag") == "select" and f.get("options"):
+            non_empty_opts = [o["value"] for o in f["options"] if o["value"] and o["value"].strip()]
+            if non_empty_opts:
+                mapping[key] = non_empty_opts[0]
+                
+    return mapping
 
 
 async def fill_field(page: Page, field: Dict[str, Any], value: str):
