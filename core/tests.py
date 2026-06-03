@@ -439,6 +439,11 @@ class WorkflowViewTests(TestCase):
         self.override.enable()
         save_master_profile(MasterProfile.model_validate(PROFILE_DATA))
         _prepare_ready_candidate()
+        
+        # Authenticate the client
+        from django.contrib.auth.models import User
+        self.test_user = User.objects.create_user(username="testuser", password="password123")
+        self.client.login(username="testuser", password="password123")
 
     def tearDown(self):
         self.override.disable()
@@ -755,4 +760,60 @@ class SchemasTests(TestCase):
         with self.assertRaises(ValueError) as context:
             validate_grounded_kit(profile, kit)
         self.assertIn("unsupported experience entries", str(context.exception))
+
+
+class SecurityHardeningTests(TestCase):
+    def test_unauthenticated_redirects_to_login(self):
+        # Protected views should redirect
+        response = self.client.get("/jobs/queue/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/accounts/login/", response.url)
+
+        # Protected view API requests should return 401
+        response = self.client.post(
+            "/jobs/generate/",
+            data={"app_id": 1},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest"
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.json()["success"])
+        self.assertEqual(response.json()["error"], "Authentication required.")
+
+    def test_authenticated_access_allowed(self):
+        from django.contrib.auth.models import User
+        User.objects.create_user(username="testuser", password="password123")
+        self.client.login(username="testuser", password="password123")
+        
+        # Now access should be allowed and not redirect to accounts/login
+        response = self.client.get("/jobs/queue/")
+        if response.status_code == 302:
+            self.assertNotIn("/accounts/login/", response.url)
+        else:
+            self.assertEqual(response.status_code, 200)
+
+    def test_encryption_roundtrip(self):
+        from .encryption import encrypt_value, decrypt_value
+        secret = "super-secret-api-key-123"
+        encrypted = encrypt_value(secret)
+        self.assertNotEqual(secret, encrypted)
+        
+        decrypted = decrypt_value(encrypted)
+        self.assertEqual(secret, decrypted)
+
+    def test_secure_credential_model(self):
+        from .models import SecureCredential
+        # Set credential
+        SecureCredential.set_val("TEST_API_KEY", "my-secret-key")
+        
+        # Verify it is encrypted in DB
+        db_record = SecureCredential.objects.get(name="TEST_API_KEY")
+        self.assertNotEqual(db_record.encrypted_value, "my-secret-key")
+        
+        # Verify get_val decrypts it correctly
+        self.assertEqual(SecureCredential.get_val("TEST_API_KEY"), "my-secret-key")
+        
+        # Delete credential
+        SecureCredential.set_val("TEST_API_KEY", "")
+        self.assertFalse(SecureCredential.objects.filter(name="TEST_API_KEY").exists())
+
 
