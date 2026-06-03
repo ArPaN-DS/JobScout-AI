@@ -103,6 +103,11 @@ class WorkflowE2ETests(LiveServerTestCase):
     def setUp(self):
         save_master_profile(MasterProfile.model_validate(PROFILE_DATA))
         _prepare_ready_candidate()
+        
+        # Authenticate the client
+        from django.contrib.auth.models import User
+        self.test_user = User.objects.create_user(username="testuser", password="password123")
+        self.client.login(username="testuser", password="password123")
 
     @patch("core.views.CareerAgentAI")
     def test_live_server_match_and_generate_kit(self, ai_class):
