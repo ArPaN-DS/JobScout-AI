@@ -25,4 +25,7 @@ urlpatterns = [
     path('settings/channels/', views.channel_settings, name='channel_settings'),
     path('integrations/telegram/webhook/', views.telegram_webhook, name='telegram_webhook'),
     path('integrations/discord/interactions/', views.discord_interactions, name='discord_interactions'),
+    path('jobs/agent-logs/<str:obj_type>/<int:obj_id>/', views.agent_logs, name='agent_logs'),
+    path('profile/qa/', views.qa_dashboard, name='qa_dashboard'),
+    path('profile/qa/verify/', views.verify_qa_item, name='verify_qa_item'),
 ]
