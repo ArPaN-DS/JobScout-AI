@@ -182,7 +182,11 @@ class GeminiAdapter:
 
     def __init__(self, model: str, api_key: str | None = None) -> None:
         self.model = model
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        if api_key:
+            self.api_key = api_key
+        else:
+            from .models import SecureCredential
+            self.api_key = SecureCredential.get_val("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
         self._client = None
 
     @property
@@ -243,7 +247,8 @@ class OpenAICompatibleAdapter:
         self.name = name
         self.model = model
         self.api_key_env = api_key_env
-        self.api_key = os.getenv(api_key_env)
+        from .models import SecureCredential
+        self.api_key = SecureCredential.get_val(api_key_env) or os.getenv(api_key_env)
         self.base_url = base_url.rstrip("/")
         self.extra_headers = extra_headers or {}
 
@@ -292,7 +297,11 @@ class AnthropicAdapter:
 
     def __init__(self, model: str, api_key: str | None = None) -> None:
         self.model = model
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        if api_key:
+            self.api_key = api_key
+        else:
+            from .models import SecureCredential
+            self.api_key = SecureCredential.get_val("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
 
     @property
     def configured(self) -> bool:
