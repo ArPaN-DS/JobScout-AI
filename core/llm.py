@@ -8,6 +8,7 @@ from enum import Enum
 from typing import Any, Protocol
 
 from django.conf import settings
+from .resilience import circuit_breaker
 
 
 class LLMTask(str, Enum):
@@ -410,6 +411,21 @@ class LLMRouter:
                 )
                 continue
 
+            # Check circuit breaker
+            circuit_name = f"llm:{adapter.name}:{adapter.model}"
+            if not circuit_breaker.is_available(circuit_name):
+                cooldown = circuit_breaker.cooldown_remaining(circuit_name)
+                attempts.append(
+                    LLMAttempt(
+                        adapter.name,
+                        adapter.model,
+                        "cooldown",
+                        error="Provider circuit is open (cooling down after consecutive failures).",
+                        retry_after_seconds=cooldown,
+                    )
+                )
+                continue
+
             cooldown_remaining = self.cooldown_remaining(adapter.name, adapter.model)
             if cooldown_remaining > 0:
                 attempts.append(
@@ -433,6 +449,7 @@ class LLMRouter:
             try:
                 text, usage = adapter.generate(request)
                 latency_ms = int((time.perf_counter() - started) * 1000)
+                circuit_breaker.record_success(circuit_name)
                 attempts.append(
                     LLMAttempt(
                         adapter.name,
@@ -462,7 +479,10 @@ class LLMRouter:
                         retry_after_seconds=retry_after,
                     )
                 )
-                if exc.rate_limited or exc.retryable:
+                circuit_breaker.record_failure(circuit_name, str(exc))
+                if exc.auth_error:
+                    blocked_providers.add(adapter.name)
+                elif exc.rate_limited or exc.retryable:
                     cooldown = retry_after or getattr(settings, "LLM_PROVIDER_COOLDOWN_SECONDS", 90)
                     self.cooldown_provider(adapter.name, adapter.model, cooldown)
                 continue
@@ -477,6 +497,7 @@ class LLMRouter:
                         error=str(exc),
                     )
                 )
+                circuit_breaker.record_failure(circuit_name, str(exc))
                 self.cooldown_provider(
                     adapter.name,
                     adapter.model,
