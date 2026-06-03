@@ -93,7 +93,7 @@ def bulk_generate_kits(top_n: int = 3, pipeline_job=None) -> dict:
         try:
             assert_within_budget(float(getattr(settings, "ESTIMATED_KIT_COST_USD", 0.02)))
             ai = CareerAgentAI()
-            kit = ai.generate_application_kit(profile_data, lead.description)
+            kit = ai.generate_application_kit(profile_data, lead.description, application=application, job_lead=lead)
             application.record_kit(kit.model_dump(mode="json"))
             metadata = ai.last_metadata()
             application.ai_metadata = {
