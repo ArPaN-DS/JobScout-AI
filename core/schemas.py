@@ -229,17 +229,41 @@ class ApplicationKit(BaseModel):
         return clean_list(value)
 
 
+class AgentCriticIssue(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    type: str = "" # e.g. "hallucination", "missing_skill", "formatting", "tone"
+    target: str = "" # e.g. "resume", "cover_letter", "general"
+    fix_instruction: str = "" # specific prompt instruction for refinement
+
+    @field_validator("type", "target", "fix_instruction", mode="before")
+    @classmethod
+    def _clean_strings(cls, value: Any) -> str:
+        return clean_text(value)
+
+
 class KitCriticVerdict(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     approved: bool = False
     issues: list[str] = Field(default_factory=list)
     unsupported_claims: list[str] = Field(default_factory=list)
+    critic_issues: list[AgentCriticIssue] = Field(default_factory=list)
 
     @field_validator("issues", "unsupported_claims", mode="before")
     @classmethod
     def _clean_lists(cls, value: Any) -> list[str]:
         return clean_list(value)
+
+    @field_validator("critic_issues", mode="before")
+    @classmethod
+    def _clean_critic_issues(cls, value: Any):
+        if value is None:
+            return []
+        if isinstance(value, dict):
+            return [value]
+        return value
+
 
 
 class BaseJobExtraction(BaseModel):
