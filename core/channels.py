@@ -172,7 +172,7 @@ def _generate_kit(arg: str) -> CommandResult:
         return CommandResult(False, "Application not found.")
     profile_data = application.profile_snapshot or load_master_profile().to_storage_dict()
     ai = CareerAgentAI()
-    kit = ai.generate_application_kit(profile_data, application.job_description)
+    kit = ai.generate_application_kit(profile_data, application.job_description, application=application, job_lead=application.source_lead)
     kit_data = kit.model_dump(mode="json")
     application.record_kit(kit_data)
     kit_metadata = safe_json_dict(ai.last_metadata())
