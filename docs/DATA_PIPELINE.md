@@ -138,3 +138,5 @@ Here is the list of Django models (`core/models.py`) and how they support the pi
 | `PipelineJob` | Monitoring / Admin | Tracks background task status (`running`, `completed`, `failed`), progress metrics, and errors. |
 | `LLMUsageEvent` | Cost Control | Records provider name, model, prompt tokens, completion tokens, cost, and timestamp. |
 | `JobSourceRun` | Monitoring / Admin | Ingestion logs monitoring rate limits, successes, and errors per source site. |
+| `SecureCredential` | Security / API Config | Stores symmetrically encrypted AI API credentials (e.g. GEMINI_API_KEY) using Fernet. |
+
