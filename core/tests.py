@@ -887,7 +887,7 @@ class RobustLLMRouterTests(TestCase):
     @patch("core.llm.build_provider_chain")
     def test_schema_validation_failure_promotes_to_pro(self, mock_build_chain):
         from core.llm import GeminiAdapter
-        gemini_adapter = GeminiAdapter(model="gemini-2.5-flash")
+        gemini_adapter = GeminiAdapter(model="gemini-2.5-flash", api_key="mock-key")
         mock_build_chain.return_value = [gemini_adapter]
 
         models_used = []
@@ -915,7 +915,7 @@ class RobustLLMRouterTests(TestCase):
     @patch("core.llm.build_provider_chain")
     def test_context_limit_exceeded_triggers_compaction_and_retries(self, mock_build_chain):
         from core.llm import GeminiAdapter, LLMProviderError
-        gemini_adapter = GeminiAdapter(model="gemini-2.5-flash")
+        gemini_adapter = GeminiAdapter(model="gemini-2.5-flash", api_key="mock-key")
         mock_build_chain.return_value = [gemini_adapter]
 
         prompts_used = []
