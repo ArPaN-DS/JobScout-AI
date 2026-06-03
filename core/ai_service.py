@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 
 from .cost_tracking import assert_within_budget, record_llm_usage
+from .logging_utils import get_logger
+
+logger = get_logger(__name__)
 from .llm import LLMExhaustedError, LLMRequest, LLMResult, LLMRouter, LLMTask
 from .prompts.registry import (
     PROMPT_VERSION,
@@ -93,6 +96,8 @@ class CareerAgentAI:
             schema=MatchResult,
             temperature=0.1,
             purpose="job match",
+            job_description=description,
+            rebuild_prompt_fn=lambda desc: build_job_match_prompt(profile.to_storage_dict(), desc),
         )
         record_llm_usage(self.last_metadata(), task_type="job_match")
         return result
@@ -113,6 +118,8 @@ class CareerAgentAI:
             schema=ApplicationKit,
             temperature=0.2,
             purpose="application kit generation",
+            job_description=description,
+            rebuild_prompt_fn=lambda desc: build_application_kit_prompt(profile.to_storage_dict(), desc),
         )
         validate_grounded_kit(profile, kit)
 
@@ -151,6 +158,12 @@ class CareerAgentAI:
             schema=KitCriticVerdict,
             temperature=0.0,
             purpose="kit critic validation",
+            job_description=job_description,
+            rebuild_prompt_fn=lambda desc: build_critic_prompt(
+                profile.to_storage_dict(),
+                desc,
+                kit.model_dump(mode="json"),
+            ),
         )
 
     def last_metadata(self) -> dict[str, Any]:
@@ -167,6 +180,9 @@ class CareerAgentAI:
         schema: type[SchemaT],
         temperature: float,
         purpose: str,
+        job_description: str | None = None,
+        rebuild_prompt_fn: Any | None = None,
+        has_compacted: bool = False,
     ) -> SchemaT:
         last_error: Exception | None = None
         current_prompt = prompt
@@ -174,7 +190,19 @@ class CareerAgentAI:
 
         for attempt in range(1, self.max_attempts + 1):
             try:
-                result = self.router.generate(
+                router = self.router
+                if attempt > 1:
+                    from .llm import build_provider_chain, LLMRouter, GeminiAdapter
+                    base_adapters = self.router.adapters or build_provider_chain(task)
+                    promoted_adapters = []
+                    for adapter in base_adapters:
+                        if isinstance(adapter, GeminiAdapter):
+                            promoted_adapters.append(GeminiAdapter(model=self.pro_model, api_key=adapter.api_key))
+                        else:
+                            promoted_adapters.append(adapter)
+                    router = LLMRouter(adapters=promoted_adapters)
+
+                result = router.generate(
                     LLMRequest(
                         task=task,
                         prompt=current_prompt,
@@ -184,6 +212,35 @@ class CareerAgentAI:
                     blocked_providers=blocked_providers,
                 )
             except LLMExhaustedError as exc:
+                from .resilience import classify_error, ErrorType
+                is_context_limit = False
+                if classify_error(exc) == ErrorType.CONTEXT_LIMIT_EXCEEDED:
+                    is_context_limit = True
+                else:
+                    for att in exc.attempts:
+                        if att.error:
+                            if classify_error(Exception(att.error)) == ErrorType.CONTEXT_LIMIT_EXCEEDED:
+                                is_context_limit = True
+                                break
+
+                if is_context_limit and job_description and rebuild_prompt_fn and not has_compacted:
+                    logger.warning(f"Context limit exceeded during {purpose}. Compacting and retrying...")
+                    from .llm import LLMRouter
+                    LLMRouter.reset_cooldowns()
+                    default_limit = int(getattr(settings, "LLM_COMPACT_MAX_CHARS", 1500))
+                    compact_limit = default_limit // 2
+                    compacted_desc = _compact_text(job_description, max_chars=compact_limit)
+                    new_prompt = rebuild_prompt_fn(compacted_desc)
+                    return self._generate_json(
+                        task=task,
+                        prompt=new_prompt,
+                        schema=schema,
+                        temperature=temperature,
+                        purpose=purpose,
+                        job_description=compacted_desc,
+                        rebuild_prompt_fn=rebuild_prompt_fn,
+                        has_compacted=True,
+                    )
                 raise AIResponseError(str(exc)) from exc
 
             self.last_result = result
@@ -193,7 +250,13 @@ class CareerAgentAI:
                 return schema.model_validate(parsed)
             except (JSONDecodeError, ValidationError, ValueError) as exc:
                 last_error = exc
-                blocked_providers.add(result.provider)
+                logger.warning(
+                    f"Attempt {attempt} failed validation for schema {schema.__name__}. "
+                    f"Error: {exc}. Provider: {result.provider}, Model: {result.model}. "
+                    f"Raw text: {raw_text}"
+                )
+                # Do not block the provider so we can try its pro_model promotion on the next attempt
+                # blocked_providers.add(result.provider)
                 if attempt < self.max_attempts:
                     current_prompt = (
                         prompt
@@ -206,7 +269,7 @@ class CareerAgentAI:
         raise AIResponseError(f"{provider} {purpose} failed schema validation: {last_error}")
 
     def extract_job_from_text(self, raw_text: str, source_url: str = "") -> dict[str, Any]:
-        prompt = f"""
+        prompt_fn = lambda text: f"""
 Extract a job lead from the text below.
 
 Rules:
@@ -229,14 +292,16 @@ Source URL:
 {source_url}
 
 Raw text:
-{raw_text.strip()}
+{text.strip()}
 """
         result = self._generate_json(
             task=LLMTask.JOB_EXTRACT,
-            prompt=prompt,
+            prompt=prompt_fn(raw_text),
             schema=BaseJobExtraction,
             temperature=0.1,
             purpose="job extraction",
+            job_description=raw_text,
+            rebuild_prompt_fn=prompt_fn,
         )
         return result.model_dump(mode="json")
 
