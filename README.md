@@ -66,9 +66,12 @@ Open the newly created `.env` file in your editor. At a minimum, set:
 ```env
 DJANGO_DEBUG=true
 DJANGO_SECRET_KEY=replace-this-with-a-long-random-secret-key-at-least-50-chars
-GEMINI_API_KEY=your-actual-api-key-here
+FIELD_ENCRYPTION_KEY=your-fernet-key-here
 ```
-*(You can get a free-tier Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).)*
+*Note on keys & credentials:*
+* Generate a secure `FIELD_ENCRYPTION_KEY` by running:
+  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode('utf-8'))"`
+* Once `FIELD_ENCRYPTION_KEY` is configured in `.env`, you can add and update your LLM provider API keys directly in the web dashboard under **Provider Settings**. Alternatively, you can set them as environment variables (e.g., `GEMINI_API_KEY=...`).
 
 ### 5. Initialize the Database
 Run migrations to set up the local SQLite database (`db.sqlite3`):
@@ -96,7 +99,16 @@ Because Job_bro_AI runs background AI scoring tasks, you need to run **two** ter
     python manage.py qcluster
     ```
 
-Open your browser and navigate to `http://127.0.0.1:8000/`. You should see the welcome interface!
+Open your browser and navigate to `http://127.0.0.1:8000/`.
+
+### 8. Authenticate and Log In
+To protect your private resume and data, Job_bro_AI requires user login:
+* If you did not create a superuser in step 6, run:
+  ```bash
+  python manage.py createsuperuser
+  ```
+* Open `http://127.0.0.1:8000/` in your browser. You will be redirected to the secure login screen.
+* Enter your superuser credentials, sign in, and you will be directed to the main career agent dashboard!
 
 ---
 
