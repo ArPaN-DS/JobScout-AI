@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block title %}Recruiter Q&A Memory | AI Career Agent{% endblock %}
+{% block page_title %}Recruiter Q&A Memory{% endblock %}
+
+{% block content %}
+{% if candidate %}
+<div class="split-layout">
+    <!-- LEFT: Add New Q&A -->
+    <section class="panel" style="flex: 1; min-width: 320px;">
+        <div class="panel-header">
+            <h3>Add New Q&A Pair</h3>
+        </div>
+        <form method="post" class="modern-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add">
+            
+            <div class="form-group">
+                <label for="question">Recruiter Question</label>
+                <input type="text" id="question" name="question" placeholder="e.g. Why are you interested in our company?" required class="form-control">
+            </div>
+            
+            <div class="form-group">
+                <label for="answer">Your Answer</label>
+                <textarea id="answer" name="answer" rows="5" placeholder="Enter your response based on your verified career claims..." required class="form-control"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" name="category" class="form-control">
+                    <option value="general">General</option>
+                    <option value="technical">Technical / Skills</option>
+                    <option value="behavioral">Behavioral / Scenarios</option>
+                    <option value="visa">Visa / Work Authorization</option>
+                    <option value="salary">Salary Expectations</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            
+            <div class="form-actions" style="margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Add Verified Answer</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- RIGHT: Q&A List -->
+    <section class="panel" style="flex: 2; min-width: 480px;">
+        <div class="panel-header">
+            <div>
+                <h3>Memory Database</h3>
+                <p>These answers will be semantically matched to fill custom recruiter forms automatically.</p>
+            </div>
+            <span class="status-pill info">{{ qa_items|length }} Saved</span>
+        </div>
+
+        <div class="qa-list" style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+            {% for qa in qa_items %}
+            <div class="claim-row" id="qa-card-{{ qa.id }}" style="display: flex; flex-direction: column; align-items: stretch; border: 1px solid var(--border-color, #e2e8f0); padding: 15px; border-radius: 8px; background: var(--bg-card, #ffffff); gap: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="status-pill neutral" style="font-size: 11px; text-transform: uppercase;">{{ qa.category }}</span>
+                    {% if qa.is_verified %}
+                    <span class="status-pill success" id="badge-{{ qa.id }}" style="font-size: 11px;">Verified</span>
+                    {% else %}
+                    <span class="status-pill warning" id="badge-{{ qa.id }}" style="font-size: 11px;">Draft (Unverified)</span>
+                    {% endif %}
+                </div>
+                
+                <div>
+                    <strong style="font-size: 14px; color: var(--text-color, #1a202c);">Q: {{ qa.question_text }}</strong>
+                </div>
+
+                <div class="form-group" style="margin: 0;">
+                    <textarea id="ans-text-{{ qa.id }}" rows="3" class="form-control" style="width: 100%; font-size: 13px;">{{ qa.answer_text }}</textarea>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 5px;">
+                    <form method="post" action="" style="margin: 0;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="qa_id" value="{{ qa.id }}">
+                        <button type="submit" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px; background: #fee2e2; color: #991b1b; border-color: #fca5a5;">Delete</button>
+                    </form>
+
+                    <button onclick="verifyItem({{ qa.id }})" class="btn btn-success" id="btn-verify-{{ qa.id }}" style="padding: 5px 12px; font-size: 12px;">
+                        {% if qa.is_verified %}Save Edits{% else %}Verify & Save{% endif %}
+                    </button>
+                </div>
+            </div>
+            {% empty %}
+            <p style="color: var(--text-muted, #718096); padding: 20px; text-align: center;">No custom recruiter questions stored yet. They will appear here when generated during job auto-applies, or you can add them manually.</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+
+<script>
+function verifyItem(qaId) {
+    const textarea = document.getElementById(`ans-text-${qaId}`);
+    const badge = document.getElementById(`badge-${qaId}`);
+    const btn = document.getElementById(`btn-verify-${qaId}`);
+    const answer = textarea.value.trim();
+    
+    if (!answer) {
+        alert("Answer content cannot be empty.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("qa_id", qaId);
+    formData.append("answer_text", answer);
+    formData.append("csrfmiddlewaretoken", "{{ csrf_token }}");
+
+    btn.disabled = true;
+    btn.innerText = "Saving...";
+
+    fetch("{% url 'verify_qa_item' %}", {
+        method: "POST",
+        body: formData,
+        headers: {
+            "X-Requested-With": "XMLHttpRequest"
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            badge.className = "status-pill success";
+            badge.innerText = "Verified";
+            btn.innerText = "Save Edits";
+        } else {
+            alert("Error: " + data.error);
+            btn.innerText = "Verify & Save";
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Failed to save. Check your connection.");
+        btn.innerText = "Verify & Save";
+    })
+    .finally(() => {
+        btn.disabled = false;
+    });
+}
+</script>
+{% else %}
+<section class="panel warning-panel">
+    <div class="panel-header">
+        <div>
+            <h2>No candidate profile</h2>
+            <p>Create a candidate profile before setting up recruiter Q&A memory.</p>
+        </div>
+        <a href="{% url 'profile_setup' %}" class="btn btn-primary">Open Profile</a>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
