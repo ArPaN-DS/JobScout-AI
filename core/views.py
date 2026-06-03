@@ -318,8 +318,60 @@ def mark_submitted(request):
         return json_error(exc, status=_exception_status(exc))
 
 
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "POST"])
 def provider_settings(request):
+    from .models import SecureCredential
+    
+    keys_to_manage = [
+        ("GEMINI_API_KEY", "Google Gemini API Key"),
+        ("OPENAI_API_KEY", "OpenAI API Key"),
+        ("ANTHROPIC_API_KEY", "Anthropic Claude API Key"),
+        ("GROQ_API_KEY", "Groq API Key"),
+        ("OPENROUTER_API_KEY", "OpenRouter API Key"),
+        ("XAI_API_KEY", "xAI Grok API Key"),
+        ("DEEPSEEK_API_KEY", "DeepSeek API Key"),
+    ]
+    
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        if action == "save_keys":
+            for key_name, _ in keys_to_manage:
+                val = request.POST.get(key_name, "").strip()
+                # If they passed a placeholder like "••••••••", it means they didn't edit it
+                if val and not val.startswith("••••"):
+                    SecureCredential.set_val(key_name, val)
+                elif val == "":
+                    # If they explicitly emptied the field, remove the key from database
+                    SecureCredential.delete_key = SecureCredential.set_val(key_name, "")
+            
+            # Reset cooldowns on key update to try again immediately
+            from .llm import LLMRouter
+            LLMRouter.reset_cooldowns()
+            return redirect("provider_settings")
+            
+    # Compile key status
+    key_configs = []
+    for key_name, label in keys_to_manage:
+        db_val = SecureCredential.get_val(key_name)
+        env_val = os.getenv(key_name)
+        
+        has_db = bool(db_val)
+        has_env = bool(env_val)
+        
+        display_val = ""
+        if has_db:
+            display_val = "••••••••" + db_val[-4:] if len(db_val) > 4 else "••••••••"
+        elif has_env:
+            display_val = "••••••••" + env_val[-4:] if len(env_val) > 4 else "••••••••"
+            
+        key_configs.append({
+            "name": key_name,
+            "label": label,
+            "has_db": has_db,
+            "has_env": has_env,
+            "display_val": display_val,
+        })
+        
     statuses = [status.__dict__ for status in provider_statuses()]
     return render(
         request,
@@ -327,8 +379,10 @@ def provider_settings(request):
         {
             "provider_statuses": statuses,
             "provider_statuses_json": json.dumps(statuses, indent=2),
+            "key_configs": key_configs,
         },
     )
+
 
 
 @require_http_methods(["GET", "POST"])
