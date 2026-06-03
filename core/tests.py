@@ -124,6 +124,13 @@ class FakeAdapter:
         self.responses = list(responses)
 
     def generate(self, request):
+        if self.name == "kit" and request.task != LLMTask.APPLICATION_KIT:
+            raise LLMProviderError("FakeAdapter kit only handles APPLICATION_KIT", retryable=False)
+        if self.name == "critic" and request.task != LLMTask.CRITIC_VALIDATE:
+            raise LLMProviderError("FakeAdapter critic only handles CRITIC_VALIDATE", retryable=False)
+
+        if not self.responses:
+            raise LLMProviderError("No more mock responses in FakeAdapter", retryable=False)
         response = self.responses.pop(0)
         if isinstance(response, Exception):
             raise response
@@ -419,7 +426,7 @@ class KitGenerationTests(TestCase):
                                 "cover_letter": "I am excited to apply for this role.",
                             }
                         )
-                    ],
+                    ] * 3,
                 ),
                 FakeAdapter(
                     "critic",
@@ -431,7 +438,7 @@ class KitGenerationTests(TestCase):
                                 "unsupported_claims": ["Kubernetes"],
                             }
                         )
-                    ],
+                    ] * 3,
                 ),
             ]
         )
