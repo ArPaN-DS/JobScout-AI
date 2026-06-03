@@ -4,48 +4,259 @@
 {% block page_title %}Provider Settings{% endblock %}
 
 {% block content %}
-<section class="panel">
-    <div class="panel-header">
-        <div>
-            <h2>LLM Provider Router</h2>
-            <p>Providers are tried in order only when their key is configured. Ollama stays off until enabled.</p>
-        </div>
+<div class="settings-grid">
+    <!-- Left column: Router Status -->
+    <div class="settings-col">
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2>LLM Provider Router</h2>
+                    <p class="subtitle">Active priority list for LLM queries. Providers are tried in order with automatic fallback if one fails.</p>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Provider</th>
+                            <th>Model</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for provider in provider_statuses %}
+                        <tr>
+                            <td><strong>{{ provider.name }}</strong></td>
+                            <td><code class="code-tag">{{ provider.model }}</code></td>
+                            <td>
+                                {% if provider.enabled %}
+                                <span class="status-pill success">Ready</span>
+                                {% else %}
+                                <span class="status-pill neutral">Off</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ provider.reason|default:"Configured and active" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
-    <div class="table-wrap">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Provider</th>
-                    <th>Model</th>
-                    <th>Status</th>
-                    <th>Reason</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for provider in provider_statuses %}
-                <tr>
-                    <td>{{ provider.name }}</td>
-                    <td>{{ provider.model }}</td>
-                    <td>
-                        {% if provider.enabled %}
-                        <span class="status-pill success">Ready</span>
-                        {% else %}
-                        <span class="status-pill neutral">Off</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ provider.reason|default:"Configured and available" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</section>
+    <!-- Right column: Database Credentials Manager -->
+    <div class="settings-col">
+        <section class="panel">
+            <div class="panel-header">
+                <div>
+                    <h2>Configure Keys (Encrypted)</h2>
+                    <p class="subtitle">Manage API keys securely. Keys entered here are symmetrically encrypted in the local database at rest.</p>
+                </div>
+            </div>
 
-<section class="panel mt-6">
-    <div class="panel-header compact">
-        <h3>Environment Contract</h3>
+            <form method="post" action="{% url 'provider_settings' %}" class="keys-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_keys">
+                
+                <div class="form-grid">
+                    {% for key in key_configs %}
+                    <div class="form-group">
+                        <div class="form-label-row">
+                            <label class="form-label" for="id_{{ key.name }}">{{ key.label }}</label>
+                            <span class="source-badge">
+                                {% if key.has_db %}
+                                <span class="badge db">Saved in DB</span>
+                                {% elif key.has_env %}
+                                <span class="badge env">From .env file</span>
+                                {% else %}
+                                <span class="badge missing">Not configured</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="input-group">
+                            <input type="password" 
+                                   name="{{ key.name }}" 
+                                   id="id_{{ key.name }}" 
+                                   class="form-input key-input" 
+                                   value="{{ key.display_val }}" 
+                                   placeholder="Enter API Key...">
+                            <button type="button" class="btn-toggle-visibility" onclick="toggleVisibility('id_{{ key.name }}')">
+                                Show
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="form-actions mt-6">
+                    <button type="submit" class="btn btn-primary w-full">Save Encrypted Credentials</button>
+                </div>
+            </form>
+        </section>
     </div>
-    <pre class="json-viewer">{{ provider_statuses_json }}</pre>
-</section>
+</div>
+
+<style>
+    .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        align-items: start;
+    }
+
+    @media (max-width: 900px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .subtitle {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 4px;
+    }
+
+    .code-tag {
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        color: #334155;
+    }
+
+    .text-muted {
+        color: #64748b;
+        font-size: 13px;
+    }
+
+    /* Key Forms Style */
+    .keys-form {
+        padding: 10px 0;
+    }
+
+    .form-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-label-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .form-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .source-badge .badge {
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+
+    .source-badge .badge.db {
+        background: rgba(129, 140, 248, 0.15);
+        color: #4f46e5;
+    }
+
+    .source-badge .badge.env {
+        background: rgba(16, 185, 129, 0.1);
+        color: #059669;
+    }
+
+    .source-badge .badge.missing {
+        background: rgba(239, 68, 68, 0.08);
+        color: #dc2626;
+    }
+
+    .input-group {
+        display: flex;
+        position: relative;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 10px 12px;
+        padding-right: 60px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+    }
+
+    .btn-toggle-visibility {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #6366f1;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 8px;
+    }
+
+    .btn-toggle-visibility:hover {
+        text-decoration: underline;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.15);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(124, 58, 237, 0.25);
+    }
+</style>
+
+<script>
+    function toggleVisibility(inputId) {
+        const input = document.getElementById(inputId);
+        const btn = input.nextElementSibling;
+        
+        if (input.type === "password") {
+            input.type = "text";
+            btn.textContent = "Hide";
+            // If it is the default placeholder, clean it to allow typing fresh key
+            if (input.value.startsWith("••••")) {
+                input.value = "";
+            }
+        } else {
+            input.type = "password";
+            btn.textContent = "Show";
+        }
+    }
+</script>
 {% endblock %}
