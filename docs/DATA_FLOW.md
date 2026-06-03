@@ -270,3 +270,100 @@ sequenceDiagram
     Webhook-->>Chat: Render bot response bubble
     deactivate View
 ```
+
+---
+
+## 6. Secure Login & Session Authentication Flow
+
+This flow maps the authentication enforcement gate for users accessing any dashboard view.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Operator (Browser)
+    participant Middleware as core.middleware (LoginRequiredMiddleware)
+    participant Auth as Django Auth View (login)
+    participant Template as templates.registration.login
+    participant DB as Database (SQLite)
+    participant Dashboard as core.views.job_queue
+
+    User->>Middleware: GET /jobs/queue/ (Request Page)
+    activate Middleware
+    Note over Middleware: Intercepts request to verify session
+    
+    alt User is authenticated
+        Middleware->>Dashboard: Allow access
+        activate Dashboard
+        Dashboard-->>User: Render Dashboard HTML
+        deactivate Dashboard
+    else User is NOT authenticated
+        alt Request is AJAX/Fetch API
+            Middleware-->>User: Return HTTP 401 JSON {"success": false, "error": "Authentication required."}
+        else Request is normal browser page load
+            Middleware-->>User: HTTP 302 Redirect to /accounts/login/?next=/jobs/queue/
+            deactivate Middleware
+            
+            activate Auth
+            Auth->>Template: Render login template
+            Template-->>User: Display beautiful login form
+            User->>Auth: POST /accounts/login/ (username + password)
+            Auth->>DB: Query user records & verify credentials password hash
+            DB-->>Auth: Verification successful
+            Auth-->>User: HTTP 302 Redirect to original target (/jobs/queue/)
+            deactivate Auth
+        end
+    end
+```
+
+---
+
+## 7. Secure Database Keys Encryption & Decryption Flow
+
+This flow details how API keys are encrypted at rest and dynamically decrypted during LLM calls.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Operator (Browser)
+    participant View as core.views.provider_settings
+    participant DB as Database (SQLite)
+    participant Encryption as core.encryption (Fernet)
+    participant Router as core.llm (LLMRouter)
+    participant API as LLM Endpoint (Gemini/OpenAI)
+
+    Note over User,View: Part A: Saving credentials
+    User->>View: POST /settings/providers/ (action=save_keys, key_value)
+    activate View
+    View->>Encryption: encrypt_value(key_value)
+    activate Encryption
+    Note over Encryption: Symmetrically encrypts using FIELD_ENCRYPTION_KEY (AES-128)
+    Encryption-->>View: Encrypted ciphertext string
+    deactivate Encryption
+    View->>DB: UPDATE SecureCredential (encrypted_value)
+    DB-->>View: Success
+    View-->>User: Redirect back to settings page (masked key shown)
+    deactivate View
+
+    Note over Router,API: Part B: Decrypting credentials for API call
+    Router->>DB: SecureCredential.get_val(key_name)
+    activate Router
+    activate DB
+    DB-->>Router: Encrypted ciphertext string
+    deactivate DB
+    
+    alt Ciphertext exists in DB
+        Router->>Encryption: decrypt_value(ciphertext)
+        activate Encryption
+        Encryption-->>Router: Plaintext API Key
+        deactivate Encryption
+    else No DB record
+        Router->>Router: Fallback to environment variables (os.getenv)
+    end
+    
+    Router->>API: Generate request using decrypted API Key
+    activate API
+    API-->>Router: Response payload
+    deactivate API
+    deactivate Router
+```
+
