@@ -134,13 +134,24 @@
                     </td>
                     <td>
                         {% if app.status == 'failed' or app.status == 'matched' %}
-                        <form method="post" action="{% url 'generate_kit' %}" class="kit-retry-form" style="display:flex; flex-direction:column; gap:4px;">
+                        <form method="post" action="{% url 'generate_kit' %}" class="kit-retry-form" style="display:flex; flex-direction:column; gap:4px; margin:0;">
                             {% csrf_token %}
                             <input type="hidden" name="app_id" value="{{ app.id }}">
                             <button type="submit" class="btn btn-primary btn-sm">{% if app.status == 'failed' %}Retry kit{% else %}Generate kit{% endif %}</button>
                             <button type="submit" name="compact" value="1" class="btn btn-secondary btn-sm">Compact retry</button>
                         </form>
-                        {% else %}—{% endif %}
+                        {% endif %}
+                        <button onclick="toggleAgentLogs({{ app.id }}, 'app')" class="btn btn-secondary btn-sm" style="margin-top: 4px; width: 100%;">Agent Logs</button>
+                    </td>
+                </tr>
+                <tr id="logs-row-{{ app.id }}" style="display:none; background:#f8fafc;">
+                    <td colspan="9">
+                        <div style="padding:15px; border-left:4px solid var(--accent, #6366f1); display:flex; flex-direction:column; gap:8px;">
+                            <h4 style="margin:0; font-size:13px; font-weight:700; color:#334155;">🤖 Stateful Agent Activity Logs</h4>
+                            <div id="logs-container-{{ app.id }}" style="display:flex; flex-direction:column; gap:6px; font-size:12.5px; max-height:250px; overflow-y:auto; padding-right:10px;">
+                                <span class="muted" style="font-style:italic;">Loading logs...</span>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
@@ -183,4 +194,55 @@
     </div>
 </section>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAgentLogs(id, type) {
+    const logsRow = document.getElementById(`logs-row-${id}`);
+    const container = document.getElementById(`logs-container-${id}`);
+    
+    if (logsRow.style.display === "none") {
+        logsRow.style.display = "table-row";
+        container.innerHTML = '<span class="muted" style="font-style:italic;">Loading logs...</span>';
+        
+        fetch(`/jobs/agent-logs/${type}/${id}/`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.logs.length > 0) {
+                    let html = '';
+                    data.logs.forEach(log => {
+                        let badgeStyle = '';
+                        if (log.status === 'success') badgeStyle = 'background:#e8f7ef; color:#16835f;';
+                        else if (log.status === 'warning') badgeStyle = 'background:#fff4e5; color:#a16207;';
+                        else if (log.status === 'error') badgeStyle = 'background:#fff1f0; color:#b42318;';
+                        else badgeStyle = 'background:#f1f5f9; color:#475569;';
+
+                        const timeStr = new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+
+                        html += `
+                            <div style="display:flex; align-items:flex-start; gap:10px; border-bottom:1px solid #e2e8f0; padding-bottom:6px; margin-bottom:6px;">
+                                <span class="status-pill" style="font-size:10px; padding:2px 8px; margin:0; ${badgeStyle}">${log.agent_name}</span>
+                                <div style="flex:1;">
+                                    <span style="color:#1e293b; font-weight:500;">${log.message}</span>
+                                    ${Object.keys(log.detail_data).length > 0 ? `<details style="margin-top:4px; font-size:11px; color:#64748b;"><summary style="cursor:pointer;">View details</summary><pre style="background:#f8fafc; padding:6px; border-radius:4px; margin-top:2px; font-family:monospace; white-space:pre-wrap; word-break:break-all;">${JSON.stringify(log.detail_data, null, 2)}</pre></details>` : ''}
+                                </div>
+                                <span style="font-size:11px; color:#94a3b8; white-space:nowrap;">${timeStr}</span>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<span class="muted" style="font-style:italic;">No agent logs found for this application yet.</span>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                container.innerHTML = '<span style="color:#b42318;">Failed to load logs.</span>';
+            });
+    } else {
+        logsRow.style.display = "none";
+    }
+}
+</script>
 {% endblock %}
