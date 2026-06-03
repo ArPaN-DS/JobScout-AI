@@ -817,3 +817,83 @@ class SecurityHardeningTests(TestCase):
         self.assertFalse(SecureCredential.objects.filter(name="TEST_API_KEY").exists())
 
 
+class RobustLLMRouterTests(TestCase):
+    def tearDown(self):
+        LLMRouter.reset_cooldowns()
+
+    def test_auth_failure_blocks_whole_provider(self):
+        adapter1 = FakeAdapter("first", [LLMProviderError("invalid key", auth_error=True, retryable=False)])
+        adapter1.model = "first-model-1"
+        adapter2 = FakeAdapter("first", ["not reached"])
+        adapter2.model = "first-model-2"
+        adapter3 = FakeAdapter("second", ['{"ok": true}'])
+        adapter3.model = "second-model"
+
+        router = LLMRouter(adapters=[adapter1, adapter2, adapter3])
+        result = router.generate(LLMRequest(task=LLMTask.JOB_MATCH, prompt="test"))
+        self.assertEqual(result.provider, "second")
+        # Check that adapter2 was skipped
+        self.assertEqual(result.attempts[0].status, "failed")
+        self.assertEqual(result.attempts[1].status, "skipped")
+        self.assertEqual(result.attempts[2].status, "success")
+
+    @patch("core.llm.build_provider_chain")
+    def test_schema_validation_failure_promotes_to_pro(self, mock_build_chain):
+        from core.llm import GeminiAdapter
+        gemini_adapter = GeminiAdapter(model="gemini-2.5-flash")
+        mock_build_chain.return_value = [gemini_adapter]
+
+        models_used = []
+        responses = [
+            ("not-json", {}),
+            ('{"match_score": 90, "summary": "Good", "matching_skills": [], "missing_skills": [], "confidence": 90, "risk_flags": []}', {})
+        ]
+
+        def dummy_generate(adapter_self, request):
+            models_used.append(adapter_self.model)
+            res = responses.pop(0)
+            if isinstance(res, Exception):
+                raise res
+            return res
+
+        with patch.object(GeminiAdapter, "generate", dummy_generate):
+            ai = CareerAgentAI(flash_model="gemini-2.5-flash", pro_model="gemini-2.5-pro", max_attempts=2)
+            result = ai.match_job_to_profile(PROFILE_DATA, "job description")
+
+        self.assertEqual(result.match_score, 90)
+        self.assertEqual(len(models_used), 2)
+        self.assertEqual(models_used[0], "gemini-2.5-flash")
+        self.assertEqual(models_used[1], "gemini-2.5-pro")
+
+    @patch("core.llm.build_provider_chain")
+    def test_context_limit_exceeded_triggers_compaction_and_retries(self, mock_build_chain):
+        from core.llm import GeminiAdapter, LLMProviderError
+        gemini_adapter = GeminiAdapter(model="gemini-2.5-flash")
+        mock_build_chain.return_value = [gemini_adapter]
+
+        prompts_used = []
+        responses = [
+            LLMProviderError("context length exceeded", retryable=False),
+            ('{"match_score": 95, "summary": "Good after compact", "matching_skills": [], "missing_skills": [], "confidence": 90, "risk_flags": []}', {})
+        ]
+
+        def dummy_generate(adapter_self, request):
+            prompts_used.append(request.prompt)
+            res = responses.pop(0)
+            if isinstance(res, Exception):
+                raise res
+            return res
+
+        with patch.object(GeminiAdapter, "generate", dummy_generate):
+            ai = CareerAgentAI(flash_model="gemini-2.5-flash", max_attempts=2)
+            job_desc = "A" * 2000
+            result = ai.match_job_to_profile(PROFILE_DATA, job_desc)
+
+        self.assertEqual(result.match_score, 95)
+        self.assertEqual(len(prompts_used), 2)
+        self.assertIn("[Description truncated for compact retry.]", prompts_used[1])
+
+
+
+
+
