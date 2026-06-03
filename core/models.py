@@ -687,3 +687,38 @@ class LLMUsageEvent(models.Model):
             models.Index(fields=["-created_at"]),
             models.Index(fields=["task_type", "-created_at"]),
         ]
+
+
+class SecureCredential(models.Model):
+    name = models.CharField(max_length=120, unique=True, db_index=True)
+    encrypted_value = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @classmethod
+    def get_val(cls, name: str, default: str | None = None) -> str | None:
+        try:
+            cred = cls.objects.get(name=name)
+            if not cred.encrypted_value:
+                return default
+            from .encryption import decrypt_value
+            return decrypt_value(cred.encrypted_value)
+        except cls.DoesNotExist:
+            return default
+
+    @classmethod
+    def set_val(cls, name: str, value: str):
+        if not value:
+            # Delete if empty/cleared
+            cls.objects.filter(name=name).delete()
+            return
+        from .encryption import encrypt_value
+        encrypted = encrypt_value(value)
+        cls.objects.update_or_create(
+            name=name,
+            defaults={"encrypted_value": encrypted}
+        )
+
+    def __str__(self):
+        return f"Secret: {self.name}"
+
