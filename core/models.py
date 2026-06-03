@@ -722,3 +722,50 @@ class SecureCredential(models.Model):
     def __str__(self):
         return f"Secret: {self.name}"
 
+
+class AgentRunLog(models.Model):
+    class Status(models.TextChoices):
+        INFO = "info", "Info"
+        SUCCESS = "success", "Success"
+        WARNING = "warning", "Warning"
+        ERROR = "error", "Error"
+
+    job_lead = models.ForeignKey("JobLead", null=True, blank=True, on_delete=models.CASCADE, related_name="agent_logs")
+    application = models.ForeignKey("Application", null=True, blank=True, on_delete=models.CASCADE, related_name="agent_logs")
+    agent_name = models.CharField(max_length=80, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.INFO, db_index=True)
+    message = models.TextField()
+    detail_data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["agent_name", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.agent_name}][{self.get_status_display()}] {self.message[:60]}"
+
+
+class CandidateQuestionAnswer(models.Model):
+    profile = models.ForeignKey(CandidateProfile, on_delete=models.CASCADE, related_name="qa_items")
+    question_text = models.TextField()
+    normalized_question = models.CharField(max_length=260, db_index=True)
+    answer_text = models.TextField()
+    category = models.CharField(max_length=80, default="general", db_index=True)
+    is_verified = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("profile", "normalized_question")
+
+    def save(self, *args, **kwargs):
+        if not self.normalized_question:
+            self.normalized_question = normalize_claim(self.question_text)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Q: {self.question_text[:50]} -> A: {self.answer_text[:50]}"
+
+
