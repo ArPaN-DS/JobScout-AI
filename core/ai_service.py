@@ -25,6 +25,7 @@ from .schemas import (
     ApplicationKit,
     BaseJobExtraction,
     KitCriticVerdict,
+    AgentCriticIssue,
     MasterProfile,
     MatchResult,
     validate_grounded_kit,
@@ -102,36 +103,192 @@ class CareerAgentAI:
         record_llm_usage(self.last_metadata(), task_type="job_match")
         return result
 
+    def log_agent_action(
+        self,
+        agent_name: str,
+        status: str,
+        message: str,
+        detail_data: dict[str, Any] | None = None,
+        application: Any = None,
+        job_lead: Any = None,
+    ):
+        try:
+            from .models import AgentRunLog
+            AgentRunLog.objects.create(
+                application=application,
+                job_lead=job_lead,
+                agent_name=agent_name,
+                status=status,
+                message=message,
+                detail_data=detail_data or {},
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create AgentRunLog: {e}")
+
     def generate_application_kit(
         self,
         master_profile: dict[str, Any] | MasterProfile,
         job_description: str,
         *,
         compact: bool = False,
+        application: Any = None,
+        job_lead: Any = None,
     ) -> ApplicationKit:
         profile = ensure_profile(master_profile)
         description = _compact_text(job_description) if compact else job_description
         assert_within_budget(float(getattr(settings, "ESTIMATED_KIT_COST_USD", 0.02)))
-        kit = self._generate_json(
-            task=LLMTask.APPLICATION_KIT,
-            prompt=build_application_kit_prompt(profile.to_storage_dict(), description),
-            schema=ApplicationKit,
-            temperature=0.2,
-            purpose="application kit generation",
-            job_description=description,
-            rebuild_prompt_fn=lambda desc: build_application_kit_prompt(profile.to_storage_dict(), desc),
-        )
-        validate_grounded_kit(profile, kit)
 
-        critic_metadata: dict[str, Any] = {"skipped": True}
-        if self.critic_enabled:
-            verdict = self.critic_validate_kit(profile, job_description, kit)
-            critic_metadata = verdict.model_dump(mode="json")
-            if not verdict.approved:
-                issues = verdict.issues or verdict.unsupported_claims or ["Critic rejected the kit."]
-                raise KitValidationError(
-                    "Application kit failed critic validation: " + "; ".join(issues[:5])
+        self.log_agent_action(
+            agent_name="TailoringExpert",
+            status="info",
+            message="Starting application kit generation...",
+            application=application,
+            job_lead=job_lead,
+        )
+
+        attempts_remaining = 3
+        current_prompt = build_application_kit_prompt(profile.to_storage_dict(), description)
+        critic_feedback_instructions = []
+        kit = None
+
+        while attempts_remaining > 0:
+            turn_num = 4 - attempts_remaining
+            self.log_agent_action(
+                agent_name="TailoringExpert",
+                status="info",
+                message=f"Generating application materials (Turn {turn_num}/3)...",
+                application=application,
+                job_lead=job_lead,
+            )
+
+            # Re-compile prompt if we have critic feedback
+            if critic_feedback_instructions:
+                current_prompt = (
+                    build_application_kit_prompt(profile.to_storage_dict(), description)
+                    + "\n\n### REVISION REQUEST FROM CRITIC AGENT:\n"
+                    + "Please refine the previous output to resolve the following issues:\n"
+                    + "\n".join(f"- {inst}" for inst in critic_feedback_instructions)
+                    + "\n\nReturn the complete updated application kit JSON."
                 )
+
+            try:
+                kit = self._generate_json(
+                    task=LLMTask.APPLICATION_KIT,
+                    prompt=current_prompt,
+                    schema=ApplicationKit,
+                    temperature=0.2,
+                    purpose="application kit generation",
+                    job_description=description,
+                    rebuild_prompt_fn=lambda desc: build_application_kit_prompt(profile.to_storage_dict(), desc),
+                )
+            except Exception as e:
+                self.log_agent_action(
+                    agent_name="TailoringExpert",
+                    status="error",
+                    message=f"LLM generation failed: {e}",
+                    application=application,
+                    job_lead=job_lead,
+                )
+                raise
+
+            # Deterministic grounding check
+            try:
+                validate_grounded_kit(profile, kit)
+                grounding_valid = True
+                deterministic_error = ""
+            except ValueError as val_err:
+                grounding_valid = False
+                deterministic_error = str(val_err)
+
+            critic_metadata: dict[str, Any] = {"skipped": True}
+            if self.critic_enabled:
+                self.log_agent_action(
+                    agent_name="QualityCritic",
+                    status="info",
+                    message="Auditing tailored application materials for grounding and requirements match...",
+                    application=application,
+                    job_lead=job_lead,
+                )
+
+                verdict = self.critic_validate_kit(profile, job_description, kit)
+                critic_metadata = verdict.model_dump(mode="json")
+
+                # If deterministic check failed, inject that issue manually into the critic issues
+                if not grounding_valid:
+                    verdict.approved = False
+                    verdict.issues.append(deterministic_error)
+                    verdict.critic_issues.append(
+                        AgentCriticIssue(
+                            type="hallucination",
+                            target="resume",
+                            fix_instruction=f"CRITICAL GROUNDING ERROR: {deterministic_error}. Make sure every skill and experience claim is backed by the candidate profile."
+                        )
+                    )
+
+                if verdict.approved:
+                    self.log_agent_action(
+                        agent_name="QualityCritic",
+                        status="success",
+                        message="Audit passed! Tailored materials are fully grounded and verified.",
+                        detail_data=critic_metadata,
+                        application=application,
+                        job_lead=job_lead,
+                    )
+                    break
+                else:
+                    attempts_remaining -= 1
+                    issues = verdict.issues or verdict.unsupported_claims or ["Critic rejected the kit."]
+                    self.log_agent_action(
+                        agent_name="QualityCritic",
+                        status="warning",
+                        message=f"Audit failed (Turn {turn_num}/3): " + "; ".join(issues[:3]),
+                        detail_data=critic_metadata,
+                        application=application,
+                        job_lead=job_lead,
+                    )
+
+                    # Prepare instructions for next turn
+                    critic_feedback_instructions = []
+                    if verdict.critic_issues:
+                        for issue in verdict.critic_issues:
+                            critic_feedback_instructions.append(
+                                f"[{issue.target.upper()}] {issue.fix_instruction} (Type: {issue.type})"
+                            )
+                    else:
+                        for issue in issues:
+                            critic_feedback_instructions.append(issue)
+            else:
+                # No critic check, check deterministic grounding
+                if not grounding_valid:
+                    self.log_agent_action(
+                        agent_name="QualityCritic",
+                        status="error",
+                        message=f"Deterministic grounding check failed: {deterministic_error}",
+                        application=application,
+                        job_lead=job_lead,
+                    )
+                    raise KitValidationError(f"Application kit failed grounding check: {deterministic_error}")
+                
+                self.log_agent_action(
+                    agent_name="QualityCritic",
+                    status="success",
+                    message="Deterministic grounding check passed (QualityCritic is disabled).",
+                    application=application,
+                    job_lead=job_lead,
+                )
+                break
+
+        else:
+            self.log_agent_action(
+                agent_name="QualityCritic",
+                status="error",
+                message="Application kit failed validation after maximum self-correction attempts.",
+                application=application,
+                job_lead=job_lead,
+            )
+            raise KitValidationError(
+                "Application kit failed critic validation after 3 attempts."
+            )
 
         self._run_extras = {
             "prompt_version": PROMPT_VERSION,
