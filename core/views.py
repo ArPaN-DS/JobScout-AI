@@ -275,7 +275,7 @@ def generate_kit(request):
         assert_ready_for_kit_generation(get_active_candidate())
         profile_data = app_record.profile_snapshot or load_master_profile().to_storage_dict()
         ai = CareerAgentAI()
-        kit = ai.generate_application_kit(profile_data, app_record.job_description, compact=compact)
+        kit = ai.generate_application_kit(profile_data, app_record.job_description, compact=compact, application=app_record, job_lead=app_record.source_lead)
         kit_data = kit.model_dump(mode="json")
         app_record.record_kit(kit_data)
         app_record.error_message = ""
@@ -780,3 +780,97 @@ def discord_interactions(request):
     result = DiscordChannelAdapter().handle(external_id, text)
     record_channel_event("discord", "command", external_id, payload, result)
     return JsonResponse({"type": 4, "data": {"content": result.message[:1900]}})
+
+
+@require_http_methods(["GET"])
+def agent_logs(request, obj_type, obj_id):
+    from .models import AgentRunLog
+    if obj_type == "lead":
+        logs = AgentRunLog.objects.filter(job_lead_id=obj_id).order_by("created_at")
+    elif obj_type == "app":
+        logs = AgentRunLog.objects.filter(application_id=obj_id).order_by("created_at")
+    else:
+        return JsonResponse({"success": False, "error": "Invalid object type."}, status=400)
+    
+    data = [
+        {
+            "agent_name": log.agent_name,
+            "status": log.status,
+            "message": log.message,
+            "detail_data": log.detail_data,
+            "created_at": log.created_at.isoformat(),
+        }
+        for log in logs
+    ]
+    return JsonResponse({"success": True, "logs": data})
+
+
+@require_http_methods(["GET", "POST"])
+def qa_dashboard(request):
+    import os
+    from .models import CandidateProfile, CandidateQuestionAnswer
+    from .schemas import normalize_claim
+    candidate = get_active_candidate()
+    
+    if request.method == "POST":
+        if not candidate:
+            return json_error("No active profile. Create one first.", status=400)
+        
+        action = request.POST.get("action", "")
+        if action == "add":
+            question = request.POST.get("question", "").strip()
+            answer = request.POST.get("answer", "").strip()
+            category = request.POST.get("category", "general").strip()
+            if not question or not answer:
+                return json_error("Question and answer are required.", status=400)
+            
+            norm_q = normalize_claim(question)
+            CandidateQuestionAnswer.objects.update_or_create(
+                profile=candidate,
+                normalized_question=norm_q[:260],
+                defaults={
+                    "question_text": question,
+                    "answer_text": answer,
+                    "category": category,
+                    "is_verified": True
+                }
+            )
+        elif action == "delete":
+            qa_id = request.POST.get("qa_id")
+            if qa_id:
+                CandidateQuestionAnswer.objects.filter(id=qa_id, profile=candidate).delete()
+        
+        return redirect("qa_dashboard")
+        
+    qa_items = []
+    if candidate:
+        qa_items = CandidateQuestionAnswer.objects.filter(profile=candidate).order_by("-is_verified", "-created_at")
+        
+    context = {
+        "candidate": candidate,
+        "qa_items": qa_items,
+    }
+    context.update(_workflow_context(candidate))
+    return render(request, "core/qa_dashboard.html", context)
+
+
+@require_POST
+def verify_qa_item(request):
+    from .models import CandidateQuestionAnswer
+    candidate = get_active_candidate()
+    if not candidate:
+        return json_error("No active candidate profile.", status=400)
+    
+    qa_id = request.POST.get("qa_id")
+    answer_text = request.POST.get("answer_text", "").strip()
+    
+    try:
+        qa = CandidateQuestionAnswer.objects.get(id=qa_id, profile=candidate)
+        if answer_text:
+            qa.answer_text = answer_text
+        qa.is_verified = True
+        qa.save(update_fields=["answer_text", "is_verified", "updated_at"])
+        return JsonResponse({"success": True, "message": "Q&A verified successfully."})
+    except CandidateQuestionAnswer.DoesNotExist:
+        return json_error("Q&A item not found.", status=404)
+
