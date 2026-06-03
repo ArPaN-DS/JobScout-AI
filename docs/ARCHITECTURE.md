@@ -32,6 +32,7 @@ flowchart TB
         Settings["career_agent/settings.py<br>(Global Config)"]
         DeploySettings["career_agent/deploy_settings.py<br>(Prod Overrides)"]
         Urls["career_agent/urls.py & core/urls.py<br>(Routing)"]
+        Middleware["core/middleware.py<br>(LoginRequiredMiddleware Gate)"]
         Views["core/views.py<br>(Web Request Handlers)"]
     end
 
@@ -54,15 +55,18 @@ flowchart TB
         Prompts["core/prompts/<br>(Prompts Registry)"]
         Router["core/llm.py<br>(LLMRouter & Adapters)"]
         Schemas["core/schemas.py<br>(Pydantic Schemas)"]
+        Encryption["core/encryption.py<br>(Fernet Cryptography)"]
     end
 
     subgraph DataStore ["Persistence Layer"]
         DB[(SQLite / PostgreSQL Database)]
         Media["Local Filesystem<br>(tmp_uploads/ & media/)"]
+        Creds["SecureCredential Model<br>(Encrypted API Keys)"]
     end
 
     %% Client Connections
-    UI --> Views
+    UI --> Middleware
+    Middleware --> Views
     TG --> Views
     DSC --> Views
     ADM --> DB
@@ -82,7 +86,9 @@ flowchart TB
     AgentAI --> Schemas
     AgentAI --> Prompts
     AgentAI --> Router
-    Router --> DB
+    Router --> Creds
+    Creds --> Encryption
+    Creds --> DB
     
     style Client fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     style AppLayer fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
