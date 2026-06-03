@@ -519,6 +519,7 @@ class LLMRouter:
     @classmethod
     def reset_cooldowns(cls) -> None:
         cls._cooldowns.clear()
+        circuit_breaker._circuits.clear()
 
 
 def build_provider_chain(task: LLMTask) -> list[LLMProviderAdapter]:
