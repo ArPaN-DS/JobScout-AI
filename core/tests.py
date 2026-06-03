@@ -66,6 +66,53 @@ class AIParsingTests(TestCase):
         with self.assertRaises(ValueError):
             validate_grounded_kit(profile, kit)
 
+    @patch("core.ai_service.pdfplumber.open")
+    def test_extract_pdf_text(self, mock_open):
+        mock_pdf = MagicMock()
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Extracted PDF Text"
+        mock_pdf.pages = [mock_page]
+        mock_open.return_value.__enter__.return_value = mock_pdf
+
+        from core.ai_service import extract_pdf_text
+        text = extract_pdf_text("dummy.pdf")
+        self.assertEqual(text, "Extracted PDF Text")
+
+        # Test empty PDF raise ValueError
+        mock_page.extract_text.return_value = ""
+        with self.assertRaises(ValueError):
+            extract_pdf_text("dummy.pdf")
+
+    @patch("docx.Document")
+    def test_extract_docx_text(self, mock_document_class):
+        mock_doc = MagicMock()
+        mock_para = MagicMock()
+        mock_para.text = "Extracted DOCX Text"
+        mock_doc.paragraphs = [mock_para]
+        mock_document_class.return_value = mock_doc
+
+        from core.ai_service import extract_docx_text
+        text = extract_docx_text("dummy.docx")
+        self.assertEqual(text, "Extracted DOCX Text")
+
+        # Test empty DOCX raise ValueError
+        mock_para.text = ""
+        with self.assertRaises(ValueError):
+            extract_docx_text("dummy.docx")
+
+    @patch("core.ai_service.extract_pdf_text")
+    @patch("core.ai_service.extract_docx_text")
+    def test_extract_document_text(self, mock_extract_docx, mock_extract_pdf):
+        mock_extract_pdf.return_value = "pdf text"
+        mock_extract_docx.return_value = "docx text"
+
+        from core.ai_service import extract_document_text
+        self.assertEqual(extract_document_text("file.pdf"), "pdf text")
+        self.assertEqual(extract_document_text("file.docx"), "docx text")
+        with self.assertRaises(ValueError):
+            extract_document_text("file.txt")
+
+
 
 class FakeAdapter:
     configured = True
