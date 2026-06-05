@@ -1,0 +1,162 @@
+<div class="active-provider-banner" id="active-provider-banner">
+    <div class="provider-banner-content">
+        <span class="pulse-dot-indicator" id="banner-dot"></span>
+        <span class="banner-text" id="banner-provider-text">Loading LLM Router...</span>
+    </div>
+</div>
+
+<style>
+    .active-provider-banner {
+        display: flex;
+        align-items: center;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 6px 12px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #475569;
+        margin-left: auto; /* Push to right in top-header */
+    }
+
+    .provider-banner-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .pulse-dot-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #cbd5e1;
+        display: inline-block;
+        transition: background-color 0.3s;
+    }
+
+    .pulse-dot-indicator.active {
+        background-color: #22c55e;
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+        animation: pulse-green 2s infinite;
+    }
+
+    .pulse-dot-indicator.fallback {
+        background-color: #f59e0b;
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+    }
+
+    .pulse-dot-indicator.error {
+        background-color: #ef4444;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+        70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+</style>
+
+<script>
+    // Global Toast Notification Helper
+    window.showRouterToast = function(message, type = "info") {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.style.position = 'fixed';
+            container.style.bottom = '25px';
+            container.style.right = '25px';
+            container.style.zIndex = '99999';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '12px';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.style.padding = '14px 22px';
+        toast.style.borderRadius = '10px';
+        toast.style.color = 'white';
+        toast.style.fontSize = '13px';
+        toast.style.fontWeight = '600';
+        toast.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.15)';
+        toast.style.transition = 'all 0.3s ease';
+        toast.style.minWidth = '280px';
+        toast.style.maxWidth = '400px';
+        toast.style.borderLeft = '4px solid rgba(0,0,0,0.2)';
+        
+        if (type === 'success') toast.style.background = '#10b981';
+        else if (type === 'error') toast.style.background = '#ef4444';
+        else if (type === 'warning') toast.style.background = '#f59e0b';
+        else toast.style.background = '#3b82f6';
+
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        // Auto remove
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
+    };
+
+    // Global fetch interceptor to check for switch_event
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const response = await originalFetch(...args);
+        // Try parsing JSON clone to inspect metadata without consuming stream
+        try {
+            const clone = response.clone();
+            const json = await clone.json();
+            if (json && json.switch_event) {
+                window.showRouterToast(json.switch_event, "warning");
+                // Trigger quick banner update
+                updateProviderBanner();
+            }
+        } catch (e) {
+            // Ignore non-json responses
+        }
+        return response;
+    };
+
+    // Banner Polling Function
+    function updateProviderBanner() {
+        originalFetch("/jobs/provider-status/")
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const textEl = document.getElementById("banner-provider-text");
+                    const dotEl = document.getElementById("banner-dot");
+                    
+                    if (data.active_provider !== "None") {
+                        textEl.textContent = `⚡ LLM: ${data.active_provider} (${data.active_model})`;
+                        
+                        // Check if any provider has credit issues or cooldowns
+                        const hasExhausted = data.provider_statuses.some(p => p.reason && p.reason.includes("exhausted"));
+                        const hasCooldowned = data.provider_statuses.some(p => p.reason && p.reason.includes("errors"));
+                        
+                        if (hasExhausted || hasCooldowned) {
+                            dotEl.className = "pulse-dot-indicator fallback";
+                        } else {
+                            dotEl.className = "pulse-dot-indicator active";
+                        }
+                    } else {
+                        textEl.textContent = "❌ No active LLM providers!";
+                        dotEl.className = "pulse-dot-indicator error";
+                    }
+                }
+            })
+            .catch(err => {
+                console.error("Failed to fetch LLM provider status:", err);
+            });
+    }
+
+    // Run on startup
+    document.addEventListener("DOMContentLoaded", () => {
+        updateProviderBanner();
+        // Poll every 30 seconds
+        setInterval(updateProviderBanner, 30000);
+    });
+</script>
