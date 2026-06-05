@@ -170,13 +170,14 @@ class TailoredExperienceItem(BaseModel):
     role: str = ""
     duration: str = ""
     highlights: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=list)
 
     @field_validator("company", "role", "duration", mode="before")
     @classmethod
     def _clean_string(cls, value: Any) -> str:
         return clean_text(value)
 
-    @field_validator("highlights", mode="before")
+    @field_validator("highlights", "evidence_refs", mode="before")
     @classmethod
     def _clean_highlights(cls, value: Any) -> list[str]:
         return clean_list(value)
