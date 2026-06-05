@@ -65,6 +65,7 @@ class CareerAgentAI:
             else getattr(settings, "KIT_CRITIC_ENABLED", True)
         )
         self.last_result: LLMResult | None = None
+        self._all_results: list[LLMResult] = []
         self.last_prompt_version = PROMPT_VERSION
         self._run_extras: dict[str, Any] = {}
 
@@ -134,6 +135,7 @@ class CareerAgentAI:
         application: Any = None,
         job_lead: Any = None,
     ) -> ApplicationKit:
+        self._all_results = []
         profile = ensure_profile(master_profile)
         description = _compact_text(job_description) if compact else job_description
         assert_within_budget(float(getattr(settings, "ESTIMATED_KIT_COST_USD", 0.02)))
@@ -295,7 +297,7 @@ class CareerAgentAI:
             "critic": critic_metadata,
             "compact": compact,
         }
-        record_llm_usage(self.last_metadata(), task_type="application_kit")
+        record_llm_usage(self.all_metadata(), task_type="application_kit")
         return kit
 
     def critic_validate_kit(
@@ -325,6 +327,29 @@ class CareerAgentAI:
 
     def last_metadata(self) -> dict[str, Any]:
         metadata: dict[str, Any] = {"prompt_version": self.last_prompt_version}
+        if self.last_result:
+            metadata.update(self.last_result.metadata())
+        metadata.update(self._run_extras)
+        return metadata
+
+    def all_metadata(self) -> dict[str, Any]:
+        """Aggregate metadata across all LLM calls in this session."""
+        metadata: dict[str, Any] = {"prompt_version": self.last_prompt_version}
+        total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        all_attempts: list[dict[str, Any]] = []
+        providers_used: set[str] = set()
+
+        for result in self._all_results:
+            providers_used.add(f"{result.provider}:{result.model}")
+            for key in total_usage:
+                total_usage[key] += result.token_usage.get(key, 0) or 0
+            all_attempts.extend(result.metadata().get("attempts", []))
+
+        metadata["total_token_usage"] = total_usage
+        metadata["providers_used"] = list(providers_used)
+        metadata["total_llm_calls"] = len(self._all_results)
+        metadata["all_attempts"] = all_attempts
+
         if self.last_result:
             metadata.update(self.last_result.metadata())
         metadata.update(self._run_extras)
@@ -401,6 +426,7 @@ class CareerAgentAI:
                 raise AIResponseError(str(exc)) from exc
 
             self.last_result = result
+            self._all_results.append(result)
             raw_text = result.text.strip()
             try:
                 parsed = extract_json_object(raw_text)
