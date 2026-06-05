@@ -19,6 +19,8 @@ urlpatterns = [
     path('jobs/generate/', views.generate_kit, name='generate_kit'),
     path('jobs/submit/', views.mark_submitted, name='mark_submitted'),
     path('applications/', views.applications_dashboard, name='applications_dashboard'),
+    path('applications/<int:app_id>/', views.application_detail, name='application_detail'),
+    path('applications/<int:app_id>/update/', views.update_application_kit, name='update_application_kit'),
     path('metrics/', views.metrics_dashboard, name='metrics_dashboard'),
     path('pipeline/<int:job_id>/cancel/', views.cancel_pipeline_job, name='cancel_pipeline_job'),
     path('settings/providers/', views.provider_settings, name='provider_settings'),
@@ -28,4 +30,5 @@ urlpatterns = [
     path('jobs/agent-logs/<str:obj_type>/<int:obj_id>/', views.agent_logs, name='agent_logs'),
     path('profile/qa/', views.qa_dashboard, name='qa_dashboard'),
     path('profile/qa/verify/', views.verify_qa_item, name='verify_qa_item'),
+    path('jobs/provider-status/', views.provider_status_api, name='provider_status_api'),
 ]
