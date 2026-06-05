@@ -96,26 +96,29 @@ flowchart TD
 
 ### Stage 4: Match Scoring & Budget Guardrails
 1. **Budget Check**: Before any LLM call, `core.cost_tracking.assert_within_budget` computes the running cost of the previous 24 hours of LLM events. If the daily budget limit is reached, it raises a budget error and stops the task.
-2. **Scoring Prompt**: The candidate profile and job description are formatted into a matching prompt (`core/prompts/registry.py`) and sent to `CareerAgentAI.match_job_to_profile`.
-3. **Pydantic Validation (`MatchResult`)**:
+2. **Provider Key & Priority Verification**: The `LLMRouter` queries the database for enabled `ProviderConfig` options, ordering them by priority score. Any provider with a credit status of `EXHAUSTED` (within its 1-hour cooldown window) is automatically bypassed.
+3. **Scoring Prompt**: The candidate profile and job description are formatted into a matching prompt (`core/prompts/registry.py`) and sent to `CareerAgentAI.match_job_to_profile`.
+4. **Pydantic Validation (`MatchResult`)**:
    - `match_score`: An integer rating from `0` to `100`.
    - `confidence`: Rating from `0.0` to `1.0`.
    - `fit_rationale`: Brief sentence detailing why they fit.
    - `missing_critical_skills`: List of missing requirements.
-4. **Routing & Promotion**:
+5. **Routing & Promotion**:
    - If `match_score >= CandidatePreference.min_match_score` AND `confidence >= CandidatePreference.min_match_confidence`, the `JobLead` status changes to `MATCHED` and an `Application` entry is created.
+   - The `JobLead` and `Application` are associated with the specific `CandidateProfile` that initiated the run, enabling multi-profile partitioning.
    - Otherwise, the status becomes `LOW_MATCH` and is archived to keep the active queue clean.
 
 ---
 
 ### Stage 5: Tailoring & Grounding Verification
-1. **Tailored Generation**: For every `MATCHED` application, the `ResumeTailor` (`core/resume_tailor.py`) matches the candidate's actual skills and achievements against the job description to output custom experience highlights.
-2. **Application Kit Generation**: The LLM compiles the complete kit (`core.schemas.ApplicationKit`):
+1. **Resume Styling Application**: The tailoring process queries the profile preferences to retrieve customize margins, font sizes, line heights, and layout themes (e.g., `modern_sans`, `classic_serif`).
+2. **Tailored Generation**: For every `MATCHED` application, the `ResumeTailor` (`core/resume_tailor.py`) matches the candidate's actual skills and achievements against the job description to output custom experience highlights.
+3. **Application Kit Generation**: The LLM compiles the complete kit (`core.schemas.ApplicationKit`):
    - Tailored Resume structure.
    - Targeted Cover Letter.
    - Direct Recruiter Message.
    - Follow-up schedule suggestions.
-3. **Grounding Check (Anti-Hallucination Guard)**:
+4. **Grounding Check (Anti-Hallucination Guard)**:
    - Generative models can accidentally invent achievements to match a job.
    - `core.schemas.validate_grounded_kit` compares every bullet point in the generated cover letter and tailored experience blocks against the candidate's verified `ProfileClaim` records.
    - If a sentence contains claims not found in the original resume (e.g., claiming to have led a 10-person Kubernetes team when the profile states only junior developer duties), the grounding validation flags the kit as invalid and initiates a regeneration attempt.
