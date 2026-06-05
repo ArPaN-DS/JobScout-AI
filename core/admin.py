@@ -13,6 +13,7 @@ from .models import (
     LLMUsageEvent,
     NotificationEvent,
     ProfileClaim,
+    ProviderConfig,
 )
 
 
@@ -142,3 +143,21 @@ class NotificationEventAdmin(admin.ModelAdmin):
     list_filter = ("channel", "status", "event_type", "created_at")
     search_fields = ("recipient", "event_type", "error_message")
     readonly_fields = ("created_at", "sent_at")
+
+
+@admin.register(ProviderConfig)
+class ProviderConfigAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "provider_name",
+        "display_name",
+        "is_enabled",
+        "priority",
+        "credit_status",
+        "estimated_balance_usd",
+        "last_balance_check",
+    )
+    list_filter = ("is_enabled", "credit_status", "adapter_type")
+    search_fields = ("provider_name", "display_name", "models")
+    readonly_fields = ("created_at", "updated_at")
+
