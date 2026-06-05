@@ -163,6 +163,28 @@ def _sync_preferences(candidate: CandidateProfile, data: dict[str, Any]) -> Cand
         )
     if data.get("discovery_sources"):
         preferences.discovery_sources = _read_list(data, "discovery_sources")
+        
+    # PDF resume styling sync
+    preferences.resume_theme = str(data.get("resume_theme") or "modern_sans").strip()
+    if data.get("resume_font_size") not in (None, ""):
+        try: preferences.resume_font_size = float(data.get("resume_font_size"))
+        except (TypeError, ValueError): pass
+    if data.get("resume_line_height") not in (None, ""):
+        try: preferences.resume_line_height = float(data.get("resume_line_height"))
+        except (TypeError, ValueError): pass
+    if data.get("resume_margin_top") not in (None, ""):
+        try: preferences.resume_margin_top = float(data.get("resume_margin_top"))
+        except (TypeError, ValueError): pass
+    if data.get("resume_margin_bottom") not in (None, ""):
+        try: preferences.resume_margin_bottom = float(data.get("resume_margin_bottom"))
+        except (TypeError, ValueError): pass
+    if data.get("resume_margin_left") not in (None, ""):
+        try: preferences.resume_margin_left = float(data.get("resume_margin_left"))
+        except (TypeError, ValueError): pass
+    if data.get("resume_margin_right") not in (None, ""):
+        try: preferences.resume_margin_right = float(data.get("resume_margin_right"))
+        except (TypeError, ValueError): pass
+        
     preferences.generate_queries()
     preferences.save()
     return preferences
