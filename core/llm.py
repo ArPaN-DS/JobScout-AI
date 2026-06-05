@@ -40,7 +40,6 @@ class LLMAttempt:
     def to_public_dict(self) -> dict[str, Any]:
         return asdict(self)
 
-
 @dataclass
 class LLMResult:
     text: str
@@ -48,6 +47,7 @@ class LLMResult:
     model: str
     attempts: list[LLMAttempt]
     token_usage: dict[str, Any] = field(default_factory=dict)
+    switch_event: str | None = None
 
     def metadata(self) -> dict[str, Any]:
         return {
@@ -55,7 +55,11 @@ class LLMResult:
             "model": self.model,
             "token_usage": self.token_usage,
             "attempts": [attempt.to_public_dict() for attempt in self.attempts],
+            "switch_event": self.switch_event,
         }
+
+
+
 
 
 @dataclass
@@ -76,12 +80,14 @@ class LLMProviderError(RuntimeError):
         retryable: bool = True,
         rate_limited: bool = False,
         auth_error: bool = False,
+        credit_exhausted: bool = False,
         retry_after_seconds: int | None = None,
     ) -> None:
         super().__init__(message)
         self.retryable = retryable
         self.rate_limited = rate_limited
         self.auth_error = auth_error
+        self.credit_exhausted = credit_exhausted
         self.retry_after_seconds = retry_after_seconds
 
 
@@ -143,11 +149,14 @@ def _json_request(
         raw = exc.read().decode("utf-8", errors="replace")
         retry_after = _parse_retry_after(exc.headers.get("retry-after"))
         message = _extract_error_message(raw) or f"HTTP {exc.code}"
+        from .credit_checker import is_credit_exhausted_error
+        is_credit = exc.code == 402 or is_credit_exhausted_error(message) or is_credit_exhausted_error(raw)
         raise LLMProviderError(
             message,
-            retryable=exc.code >= 500 or exc.code in {408, 409, 425, 429},
+            retryable=not is_credit and (exc.code >= 500 or exc.code in {408, 409, 425, 429}),
             rate_limited=exc.code == 429,
             auth_error=exc.code in {401, 403},
+            credit_exhausted=is_credit,
             retry_after_seconds=retry_after,
         ) from exc
     except (TimeoutError, urllib.error.URLError) as exc:
@@ -459,12 +468,18 @@ class LLMRouter:
                         token_usage=usage,
                     )
                 )
+                switch_event = None
+                failed_attempts = [att for att in attempts if att.status in ("failed", "cooldown")]
+                if failed_attempts:
+                    first_fail = failed_attempts[0]
+                    switch_event = f"⚠️ Switched to {adapter.name} ({adapter.model}) because {first_fail.provider} ({first_fail.model}) failed: {first_fail.error or 'cooldown'}"
                 return LLMResult(
                     text=text,
                     provider=adapter.name,
                     model=adapter.model,
                     attempts=attempts,
                     token_usage=usage,
+                    switch_event=switch_event,
                 )
             except LLMProviderError as exc:
                 latency_ms = int((time.perf_counter() - started) * 1000)
@@ -480,8 +495,17 @@ class LLMRouter:
                     )
                 )
                 circuit_breaker.record_failure(circuit_name, str(exc))
-                if exc.auth_error:
+                if exc.credit_exhausted:
+                    from .models import ProviderConfig
+                    try:
+                        cfg = ProviderConfig.objects.get(provider_name=adapter.name)
+                        cfg.mark_credit_exhausted()
+                    except Exception:
+                        pass
+                    self.cooldown_provider(adapter.name, adapter.model, 3600)
+                elif exc.auth_error:
                     blocked_providers.add(adapter.name)
+                    self.cooldown_provider(adapter.name, adapter.model, 300)
                 elif exc.rate_limited or exc.retryable:
                     cooldown = retry_after or getattr(settings, "LLM_PROVIDER_COOLDOWN_SECONDS", 90)
                     self.cooldown_provider(adapter.name, adapter.model, cooldown)
@@ -498,11 +522,22 @@ class LLMRouter:
                     )
                 )
                 circuit_breaker.record_failure(circuit_name, str(exc))
-                self.cooldown_provider(
-                    adapter.name,
-                    adapter.model,
-                    getattr(settings, "LLM_PROVIDER_COOLDOWN_SECONDS", 90),
-                )
+                from .credit_checker import is_credit_exhausted_error
+                is_credit = is_credit_exhausted_error(str(exc))
+                if is_credit:
+                    from .models import ProviderConfig
+                    try:
+                        cfg = ProviderConfig.objects.get(provider_name=adapter.name)
+                        cfg.mark_credit_exhausted()
+                    except Exception:
+                        pass
+                    self.cooldown_provider(adapter.name, adapter.model, 3600)
+                else:
+                    self.cooldown_provider(
+                        adapter.name,
+                        adapter.model,
+                        getattr(settings, "LLM_PROVIDER_COOLDOWN_SECONDS", 90),
+                    )
                 continue
 
         raise LLMExhaustedError(attempts)
@@ -522,7 +557,79 @@ class LLMRouter:
         circuit_breaker._circuits.clear()
 
 
+def build_adapter(config, model: str) -> LLMProviderAdapter:
+    from .models import SecureCredential
+    key_name = config.api_key_name
+    api_key = SecureCredential.get_val(key_name) or os.getenv(key_name)
+
+    if config.adapter_type == "gemini":
+        return GeminiAdapter(model=model, api_key=api_key)
+    elif config.adapter_type == "anthropic":
+        return AnthropicAdapter(model=model, api_key=api_key)
+    elif config.adapter_type == "ollama":
+        base_url = config.base_url or getattr(settings, "OLLAMA_BASE_URL", "http://localhost:11434")
+        return OllamaAdapter(model=model, base_url=base_url, enabled=config.is_enabled)
+    else:
+        base_url = config.base_url or "https://api.openai.com/v1"
+        return OpenAICompatibleAdapter(
+            name=config.provider_name,
+            model=model,
+            api_key_env=config.api_key_name,
+            base_url=base_url,
+            extra_headers=config.extra_headers,
+        )
+
+
+def _get_default_model_for_provider(provider_name: str, task: LLMTask) -> str:
+    if provider_name == "gemini":
+        return (
+            getattr(settings, "GEMINI_PRO_MODEL", "gemini-2.5-pro")
+            if task == LLMTask.APPLICATION_KIT
+            else getattr(settings, "GEMINI_FLASH_MODEL", "gemini-2.5-flash")
+        )
+    elif provider_name == "openai":
+        return getattr(settings, "OPENAI_MODEL", "gpt-4.1-mini")
+    elif provider_name == "anthropic":
+        return getattr(settings, "ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+    elif provider_name == "xai":
+        return getattr(settings, "XAI_MODEL", "grok-3-mini")
+    elif provider_name == "groq":
+        return getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+    elif provider_name == "openrouter":
+        return getattr(settings, "OPENROUTER_MODEL", "openrouter/auto")
+    elif provider_name == "deepseek":
+        return getattr(settings, "DEEPSEEK_MODEL", "deepseek-chat")
+    elif provider_name == "kimi":
+        return getattr(settings, "MOONSHOT_MODEL", "kimi-k2.5")
+    elif provider_name == "qwen":
+        return getattr(settings, "DASHSCOPE_MODEL", "qwen-plus")
+    elif provider_name == "ollama":
+        return getattr(settings, "OLLAMA_MODEL", "llama3.1")
+    return "gpt-4.1-mini"
+
+
 def build_provider_chain(task: LLMTask) -> list[LLMProviderAdapter]:
+    from django.db.utils import OperationalError, ProgrammingError
+    from .models import ProviderConfig
+    
+    configs = []
+    try:
+        configs = list(ProviderConfig.objects.filter(is_enabled=True).order_by("priority"))
+    except (OperationalError, ProgrammingError):
+        pass
+
+    if configs:
+        adapters = []
+        for config in configs:
+            if not config.is_available():
+                continue
+            models_to_use = config.models
+            if not models_to_use:
+                models_to_use = [_get_default_model_for_provider(config.provider_name, task)]
+            for model in models_to_use:
+                adapters.append(build_adapter(config, model))
+        return adapters
+
     order = getattr(settings, "LLM_PROVIDER_ORDER", [])
     adapters = _adapter_map(task)
     return [adapters[name] for name in order if name in adapters]
@@ -530,6 +637,46 @@ def build_provider_chain(task: LLMTask) -> list[LLMProviderAdapter]:
 
 def provider_statuses(task: LLMTask = LLMTask.JOB_MATCH) -> list[ProviderStatus]:
     statuses: list[ProviderStatus] = []
+    from django.db.utils import OperationalError, ProgrammingError
+    from .models import ProviderConfig
+    
+    configs = []
+    try:
+        configs = list(ProviderConfig.objects.all().order_by("priority"))
+    except (OperationalError, ProgrammingError):
+        pass
+
+    if configs:
+        for config in configs:
+            cooldown = config.cooldown_remaining()
+            models_to_check = config.models or [_get_default_model_for_provider(config.provider_name, task)]
+            for model in models_to_check:
+                r_cooldown = LLMRouter.cooldown_remaining(config.provider_name, model)
+                cb_cooldown = circuit_breaker.cooldown_remaining(f"llm:{config.provider_name}:{model}")
+                max_cooldown = max(cooldown, r_cooldown, cb_cooldown)
+                
+                configured = bool(config.is_enabled)
+                enabled = config.is_enabled and max_cooldown == 0
+                reason = ""
+                if not config.is_enabled:
+                    reason = "Disabled by user."
+                elif cooldown > 0:
+                    reason = f"Credit exhausted cooldown (cooldown remaining: {cooldown}s)."
+                elif r_cooldown > 0 or cb_cooldown > 0:
+                    reason = "Cooling down after errors."
+
+                statuses.append(
+                    ProviderStatus(
+                        name=config.provider_name,
+                        model=model,
+                        configured=configured,
+                        enabled=enabled,
+                        reason=reason,
+                        cooldown_remaining_seconds=max_cooldown,
+                    )
+                )
+        return statuses
+
     for adapter in build_provider_chain(task):
         configured = adapter.configured
         cooldown = LLMRouter.cooldown_remaining(adapter.name, adapter.model)
@@ -620,9 +767,12 @@ def _adapter_map(task: LLMTask) -> dict[str, LLMProviderAdapter]:
 def _provider_error_from_exception(exc: Exception) -> LLMProviderError:
     message = str(exc)
     lowered = message.lower()
+    from .credit_checker import is_credit_exhausted_error
+    is_credit = is_credit_exhausted_error(message)
     return LLMProviderError(
         message,
-        retryable=not any(marker in lowered for marker in ["api key", "permission", "unauthorized"]),
+        retryable=not is_credit and not any(marker in lowered for marker in ["api key", "permission", "unauthorized"]),
         rate_limited=any(marker in lowered for marker in ["429", "quota", "rate limit"]),
         auth_error=any(marker in lowered for marker in ["api key", "permission", "unauthorized", "403", "401"]),
+        credit_exhausted=is_credit,
     )
