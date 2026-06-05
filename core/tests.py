@@ -21,6 +21,7 @@ from .llm import (
     LLMTask,
     OllamaAdapter,
     provider_statuses,
+    build_provider_chain,
 )
 from .models import Application, CandidateLink, CandidateProfile, EvidenceSource, ProfileClaim
 from .profile_store import load_master_profile, save_master_profile
@@ -946,6 +947,280 @@ class RobustLLMRouterTests(TestCase):
         self.assertEqual(result.match_score, 95)
         self.assertEqual(len(prompts_used), 2)
         self.assertIn("[Description truncated for compact retry.]", prompts_used[1])
+
+
+class AdditionalSubsystemTests(TestCase):
+    def test_tailored_experience_item_evidence_refs(self):
+        # Verify schema validation with evidence_refs
+        data = {
+            "company": "Google",
+            "role": "Software Engineer",
+            "duration": "2 years",
+            "highlights": ["Designed API schemas", "Improved search indexing"],
+            "evidence_refs": ["claim_1", "claim_2"]
+        }
+        item = TailoredExperienceItem.model_validate(data)
+        self.assertEqual(item.company, "Google")
+        self.assertEqual(item.evidence_refs, ["claim_1", "claim_2"])
+
+    def test_validate_grounded_kit_validation_with_evidence_refs(self):
+        # We can also test validate_grounded_kit
+        profile = MasterProfile.model_validate(PROFILE_DATA)
+        kit = ApplicationKit.model_validate({
+            "tailored_resume": {
+                "name": "Alex Morgan",
+                "skills": ["Python"],
+                "experience": [
+                    {
+                        "company": "Example Labs",
+                        "role": "Software Engineer",
+                        "duration": "2024 - Present",
+                        "highlights": ["Built Django applications"],
+                        "evidence_refs": ["claim_1"]
+                    }
+                ]
+            },
+            "cover_letter": "I am interested."
+        })
+        validate_grounded_kit(profile, kit)
+
+    @patch("core.tasks.CareerAgentAI")
+    def test_smart_multi_profile_selector_picks_highest_scoring(self, mock_ai_class):
+        from core.models import CandidatePreference, JobLead
+
+        # Clean up existing profiles/leads to isolate the test
+        CandidateProfile.objects.all().delete()
+        JobLead.objects.all().delete()
+        
+        # Create profile A (Web Developer)
+        profile_a = CandidateProfile.objects.create(
+            full_name="Profile Web",
+            is_active=True,
+            status=CandidateProfile.Status.READY
+        )
+        CandidatePreference.objects.create(
+            profile=profile_a,
+            min_match_score=60,
+            min_match_confidence=50
+        )
+        
+        # Create profile B (Embedded Engineer)
+        profile_b = CandidateProfile.objects.create(
+            full_name="Profile Embedded",
+            is_active=True,
+            status=CandidateProfile.Status.READY
+        )
+        CandidatePreference.objects.create(
+            profile=profile_b,
+            min_match_score=60,
+            min_match_confidence=50
+        )
+
+        # Create a new unscored lead
+        lead = JobLead.objects.create(
+            title="Embedded developer",
+            company="MicroTech",
+            description="C/C++ embedded systems engineer for microcontrollers.",
+            status=JobLead.Status.NEW
+        )
+
+        def match_side_effect(master_profile, job_description):
+            res = 90 if master_profile.name == "Profile Embedded" else 45
+            return MatchResult.model_validate({
+                "match_score": res,
+                "summary": "Mock match result summary",
+                "matching_skills": [],
+                "missing_skills": [],
+                "confidence": 80,
+                "risk_flags": [],
+            })
+
+        mock_ai_instance = mock_ai_class.return_value
+        mock_ai_instance.match_job_to_profile.side_effect = match_side_effect
+        mock_ai_instance.last_metadata.return_value = {"provider": "mock"}
+
+        from core.tasks import score_unscored_leads
+        scored_count = score_unscored_leads(limit=1)
+
+        self.assertEqual(scored_count, 1)
+        lead.refresh_from_db()
+        
+        self.assertEqual(lead.matched_profile, profile_b)
+        self.assertEqual(lead.match_score, 90)
+        self.assertEqual(lead.status, JobLead.Status.MATCHED)
+
+        app = Application.objects.get(source_lead=lead)
+        self.assertEqual(app.profile, profile_b)
+        self.assertEqual(app.match_score, 90)
+
+    @patch("core.resume_tailor.async_playwright")
+    def test_resume_theme_compilation_and_playwright_margins(self, mock_playwright):
+        from unittest.mock import AsyncMock
+        from core.models import CandidatePreference
+        mock_p = AsyncMock()
+        mock_browser = AsyncMock()
+        mock_page = AsyncMock()
+        
+        mock_playwright.return_value.__aenter__.return_value = mock_p
+        mock_p.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+        
+        profile = CandidateProfile.objects.create(
+            full_name="Alex ThemeTester",
+            email="alex@theme.com",
+            phone="123-456-7890",
+            location="SF"
+        )
+        pref = CandidatePreference.objects.create(
+            profile=profile,
+            resume_theme="classic_serif",
+            resume_font_size=11.5,
+            resume_line_height=1.4,
+            resume_margin_top=0.6,
+            resume_margin_bottom=0.6,
+            resume_margin_left=0.8,
+            resume_margin_right=0.8
+        )
+        
+        app_record = Application.objects.create(
+            profile=profile,
+            job_description="Standard Job",
+            tailored_resume={
+                "name": "Alex ThemeTester",
+                "skills": ["Python", "Django"],
+                "experience": [
+                    {
+                        "company": "ThemeCorp",
+                        "role": "Designer",
+                        "duration": "1 year",
+                        "highlights": ["Built dynamic themes"]
+                    }
+                ]
+            }
+        )
+
+        import asyncio
+        from core.resume_tailor import compile_tailored_resume_to_pdf
+        
+        pdf_path = asyncio.run(compile_tailored_resume_to_pdf(app_record, profile))
+        self.assertTrue(pdf_path.endswith(".pdf"))
+        
+        mock_page.set_content.assert_called_once()
+        html_arg = mock_page.set_content.call_args[0][0]
+        self.assertIn("Georgia", html_arg)
+        self.assertIn("11.5pt", html_arg)
+        self.assertIn("line-height: 1.4", html_arg)
+        
+        mock_page.pdf.assert_called_once()
+        pdf_kwargs = mock_page.pdf.call_args[1]
+        self.assertEqual(pdf_kwargs["format"], "A4")
+        self.assertEqual(pdf_kwargs["margin"], {
+            "top": "0.6in",
+            "bottom": "0.6in",
+            "left": "0.8in",
+            "right": "0.8in"
+        })
+
+        # Test minimalist theme
+        mock_page.reset_mock()
+        pref.resume_theme = "minimalist"
+        pref.save()
+        
+        asyncio.run(compile_tailored_resume_to_pdf(app_record, profile))
+        html_arg_minimalist = mock_page.set_content.call_args[0][0]
+        self.assertIn("Courier New", html_arg_minimalist)
+
+
+class ProviderFallbackTests(TestCase):
+    def setUp(self):
+        from core.models import ProviderConfig
+        ProviderConfig.objects.all().delete()
+        LLMRouter.reset_cooldowns()
+
+    def test_fallback_to_settings(self):
+        chain = build_provider_chain(LLMTask.JOB_MATCH)
+        self.assertTrue(len(chain) > 0)
+        self.assertEqual(chain[0].name, "gemini")
+
+    def test_provider_reorder(self):
+        from core.models import ProviderConfig
+        c1 = ProviderConfig.objects.create(
+            provider_name="openai",
+            display_name="OpenAI",
+            api_key_name="OPENAI_API_KEY",
+            adapter_type="openai_compatible",
+            models=["gpt-4.1-mini"],
+            priority=0,
+            is_enabled=True
+        )
+        c2 = ProviderConfig.objects.create(
+            provider_name="gemini",
+            display_name="Gemini",
+            api_key_name="GEMINI_API_KEY",
+            adapter_type="gemini",
+            models=["gemini-2.5-flash"],
+            priority=1,
+            is_enabled=True
+        )
+        
+        chain = build_provider_chain(LLMTask.JOB_MATCH)
+        self.assertEqual(chain[0].name, "openai")
+        self.assertEqual(chain[1].name, "gemini")
+
+    @patch("core.llm.GeminiAdapter.generate")
+    def test_multi_model_cascade_and_switch_event(self, mock_gemini_generate):
+        from core.models import ProviderConfig
+        c1 = ProviderConfig.objects.create(
+            provider_name="gemini",
+            display_name="Gemini",
+            api_key_name="GEMINI_API_KEY",
+            adapter_type="gemini",
+            models=["gemini-2.5-flash", "gemini-2.5-pro"],
+            priority=0,
+            is_enabled=True
+        )
+        
+        from core.llm import LLMProviderError
+        mock_gemini_generate.side_effect = [
+            LLMProviderError("Flash rate limit", rate_limited=True),
+            ("pro success response", {"prompt_tokens": 10})
+        ]
+        
+        router = LLMRouter()
+        req = LLMRequest(task=LLMTask.JOB_MATCH, prompt="test prompt")
+        res = router.generate(req)
+        
+        self.assertEqual(res.text, "pro success response")
+        self.assertEqual(res.provider, "gemini")
+        self.assertEqual(res.model, "gemini-2.5-pro")
+        self.assertIn("gemini-2.5-flash) failed", res.switch_event)
+
+    @patch("core.llm.GeminiAdapter.generate")
+    def test_credit_exhausted_detection(self, mock_gemini_generate):
+        from core.models import ProviderConfig
+        c1 = ProviderConfig.objects.create(
+            provider_name="gemini",
+            display_name="Gemini",
+            api_key_name="GEMINI_API_KEY",
+            adapter_type="gemini",
+            models=["gemini-2.5-flash"],
+            priority=0,
+            is_enabled=True
+        )
+        
+        from core.llm import LLMProviderError
+        mock_gemini_generate.side_effect = LLMProviderError("insufficient_quota: billing limit reached", credit_exhausted=True)
+        
+        router = LLMRouter()
+        req = LLMRequest(task=LLMTask.JOB_MATCH, prompt="test prompt")
+        
+        with self.assertRaises(LLMExhaustedError):
+            router.generate(req)
+            
+        c1.refresh_from_db()
+        self.assertEqual(c1.credit_status, "exhausted")
+        self.assertFalse(c1.is_available())
+
 
 
 
