@@ -540,11 +540,13 @@ def provider_settings(request):
                 return JsonResponse({
                     "success": True,
                     "balance": bal,
-                    "simulated": res.get("simulated", False),
+                    "simulated": False,
                     "credit_status": config.credit_status,
                 })
             else:
-                return json_error(res.get("error", "Balance check failed."))
+                if res.get("exhausted"):
+                    config.mark_credit_exhausted()
+                return json_error(res.get("error", "Key verification failed."))
 
         elif action == "add_provider":
             p_name = request.POST.get("provider_name", "").strip().lower()
