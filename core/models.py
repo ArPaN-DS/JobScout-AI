@@ -277,6 +277,13 @@ class CandidatePreference(models.Model):
     min_match_confidence = models.PositiveSmallIntegerField(default=50)
     job_freshness_hours = models.PositiveSmallIntegerField(default=24)
     discovery_sources = models.JSONField(default=list, blank=True)
+    resume_theme = models.CharField(max_length=40, default="modern_sans")
+    resume_font_size = models.FloatField(default=10.5)
+    resume_line_height = models.FloatField(default=1.35)
+    resume_margin_top = models.FloatField(default=0.75)
+    resume_margin_bottom = models.FloatField(default=0.75)
+    resume_margin_left = models.FloatField(default=0.75)
+    resume_margin_right = models.FloatField(default=0.75)
     updated_at = models.DateTimeField(auto_now=True)
 
     def generate_queries(self):
@@ -320,6 +327,13 @@ class CandidatePreference(models.Model):
             "min_match_confidence": self.min_match_confidence,
             "job_freshness_hours": self.job_freshness_hours,
             "discovery_sources": clean_json_list(self.discovery_sources),
+            "resume_theme": self.resume_theme,
+            "resume_font_size": self.resume_font_size,
+            "resume_line_height": self.resume_line_height,
+            "resume_margin_top": self.resume_margin_top,
+            "resume_margin_bottom": self.resume_margin_bottom,
+            "resume_margin_left": self.resume_margin_left,
+            "resume_margin_right": self.resume_margin_right,
         }
 
     def __str__(self):
@@ -338,6 +352,7 @@ class Application(models.Model):
         AUTO_APPLIED = "auto_applied", "Auto Applied"
         MANUAL_REQUIRED = "manual_required", "Manual Required"
 
+    profile = models.ForeignKey(CandidateProfile, on_delete=models.CASCADE, related_name="applications", null=True)
     job_url = models.URLField(max_length=500, blank=True, null=True)
     job_description = models.TextField()
     match_score = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -408,6 +423,7 @@ class Application(models.Model):
             self.ai_metadata["match_llm"] = safe_metadata
         self.save(
             update_fields=[
+                "profile",
                 "match_score",
                 "match_summary",
                 "matching_skills",
@@ -468,6 +484,7 @@ class JobLead(models.Model):
         APPLIED = "applied", "Applied"
         FAILED = "failed", "Failed"
 
+    matched_profile = models.ForeignKey(CandidateProfile, on_delete=models.SET_NULL, related_name="matched_leads", null=True, blank=True)
     source_type = models.CharField(max_length=60, default="manual", db_index=True)
     source_name = models.CharField(max_length=120, blank=True)
     external_id = models.CharField(max_length=200, blank=True)
@@ -545,7 +562,7 @@ class JobLead(models.Model):
         safe_metadata = safe_json_dict(ai_metadata)
         if safe_metadata:
             self.ai_metadata["match_llm"] = safe_metadata
-        self.save(update_fields=["match_score", "match_summary", "status", "error_message", "ai_metadata", "updated_at"])
+        self.save(update_fields=["matched_profile", "match_score", "match_summary", "status", "error_message", "ai_metadata", "updated_at"])
 
     def dismiss(self):
         self.status = self.Status.DISMISSED
@@ -767,5 +784,77 @@ class CandidateQuestionAnswer(models.Model):
 
     def __str__(self):
         return f"Q: {self.question_text[:50]} -> A: {self.answer_text[:50]}"
+
+
+class ProviderConfig(models.Model):
+    class CreditStatus(models.TextChoices):
+        OK = "ok", "OK"
+        LOW = "low", "Low"
+        EXHAUSTED = "exhausted", "Exhausted"
+        UNKNOWN = "unknown", "Unknown"
+
+    provider_name = models.CharField(max_length=80, unique=True, db_index=True)
+    display_name = models.CharField(max_length=120)
+    is_enabled = models.BooleanField(default=True, db_index=True)
+    priority = models.PositiveSmallIntegerField(default=0, db_index=True)
+    api_key_name = models.CharField(max_length=80)
+    base_url = models.URLField(max_length=500, blank=True)
+    adapter_type = models.CharField(max_length=80, default="openai_compatible")
+    credit_status = models.CharField(
+        max_length=24,
+        choices=CreditStatus.choices,
+        default=CreditStatus.UNKNOWN,
+        db_index=True,
+    )
+    estimated_balance_usd = models.FloatField(null=True, blank=True)
+    last_balance_check = models.DateTimeField(null=True, blank=True)
+    credit_exhausted_at = models.DateTimeField(null=True, blank=True)
+    extra_headers = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    models = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ["priority", "provider_name"]
+
+    def __str__(self):
+        return f"{self.display_name} ({self.provider_name})"
+
+    def is_available(self) -> bool:
+        if not self.is_enabled:
+            return False
+        if self.credit_status == self.CreditStatus.EXHAUSTED and self.credit_exhausted_at:
+            elapsed = (timezone.now() - self.credit_exhausted_at).total_seconds()
+            if elapsed < 3600:  # 1 hour cooldown
+                return False
+        return True
+
+    def mark_credit_exhausted(self):
+        self.credit_status = self.CreditStatus.EXHAUSTED
+        self.credit_exhausted_at = timezone.now()
+        self.save(update_fields=["credit_status", "credit_exhausted_at", "updated_at"])
+
+    def mark_credit_ok(self, balance=None):
+        self.credit_status = self.CreditStatus.OK
+        self.credit_exhausted_at = None
+        if balance is not None:
+            self.estimated_balance_usd = balance
+        self.last_balance_check = timezone.now()
+        self.save(
+            update_fields=[
+                "credit_status",
+                "credit_exhausted_at",
+                "estimated_balance_usd",
+                "last_balance_check",
+                "updated_at",
+            ]
+        )
+
+    def cooldown_remaining(self) -> int:
+        if self.credit_status == self.CreditStatus.EXHAUSTED and self.credit_exhausted_at:
+            elapsed = (timezone.now() - self.credit_exhausted_at).total_seconds()
+            return max(0, int(3600 - elapsed))
+        return 0
+
 
 
