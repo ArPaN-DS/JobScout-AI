@@ -13,7 +13,7 @@ from .discovery import (
 from .job_runner import JobCancelledError, make_idempotency_key, run_tracked, update_progress
 from .job_sources import create_application_from_lead
 from .match_policy import thresholds_for_candidate
-from .models import Application, JobLead
+from .models import Application, JobLead, CandidateProfile
 from .profile_readiness import assert_ready_for_kit_generation
 from .profile_store import get_active_candidate, load_master_profile
 
@@ -25,28 +25,52 @@ except Exception:  # pragma: no cover - django-q2 is optional in local dev
 
 def score_unscored_leads(limit: int = 10, pipeline_job=None) -> int:
     archive_stale_leads()
-    profile = load_master_profile()
-    candidate = get_active_candidate()
-    thresholds = thresholds_for_candidate(candidate)
+    active_profiles = list(CandidateProfile.objects.filter(is_active=True))
+    if not active_profiles:
+        active_profiles = [get_active_candidate()]
+        
     leads = list(JobLead.objects.filter(status=JobLead.Status.NEW).exclude(description="")[:limit])
     scored = 0
 
     for index, lead in enumerate(leads, start=1):
         if pipeline_job:
             update_progress(pipeline_job, index - 1, f"Scoring {index}/{len(leads)}…")
-        assert_within_budget(estimate_cost_from_metadata({}, "job_match"))
-        ai = CareerAgentAI()
-        match = ai.match_job_to_profile(profile, lead.description)
-        match_data = match.model_dump(mode="json")
-        lead.record_score(match_data, ai_metadata=ai.last_metadata(), thresholds=thresholds)
-        if thresholds.is_strong_match(match.match_score, match.confidence):
-            application = create_application_from_lead(lead, profile_snapshot=profile.to_storage_dict())
-            application.record_match(
-                match_data,
-                profile_snapshot=profile.to_storage_dict(),
-                ai_metadata=ai.last_metadata(),
-                thresholds=thresholds,
-            )
+        
+        best_match = None
+        best_score = -1
+        best_profile = None
+        best_ai_metadata = None
+        
+        for profile in active_profiles:
+            if not profile:
+                continue
+            master = profile.to_master_profile()
+            assert_within_budget(estimate_cost_from_metadata({}, "job_match"))
+            ai = CareerAgentAI()
+            match = ai.match_job_to_profile(master, lead.description)
+            match_data = match.model_dump(mode="json")
+            score = match.match_score
+            
+            if score > best_score:
+                best_score = score
+                best_match = match_data
+                best_profile = profile
+                best_ai_metadata = ai.last_metadata()
+                
+        if best_profile is not None:
+            thresholds = thresholds_for_candidate(best_profile)
+            lead.matched_profile = best_profile
+            lead.record_score(best_match, ai_metadata=best_ai_metadata, thresholds=thresholds)
+            if thresholds.is_strong_match(best_score, best_match.get("confidence", 50)):
+                profile_snapshot = best_profile.to_master_profile().to_storage_dict()
+                application = create_application_from_lead(lead, profile_snapshot=profile_snapshot)
+                application.profile = best_profile
+                application.record_match(
+                    best_match,
+                    profile_snapshot=profile_snapshot,
+                    ai_metadata=best_ai_metadata,
+                    thresholds=thresholds,
+                )
         scored += 1
 
     if pipeline_job:
@@ -69,10 +93,7 @@ def run_discovery_pipeline(*, score_after: bool = True, score_limit: int = 20, p
 
 
 def bulk_generate_kits(top_n: int = 3, pipeline_job=None) -> dict:
-    candidate = get_active_candidate()
-    assert_ready_for_kit_generation(candidate)
-    profile = load_master_profile()
-    profile_data = profile.to_storage_dict()
+    default_candidate = get_active_candidate()
     leads = get_matched_leads_for_kits(limit=top_n)
     generated = 0
     errors: list[str] = []
@@ -80,16 +101,33 @@ def bulk_generate_kits(top_n: int = 3, pipeline_job=None) -> dict:
     for index, lead in enumerate(leads, start=1):
         if pipeline_job:
             update_progress(pipeline_job, index - 1, f"Generating kit {index}/{len(leads)}…")
+        
         application = lead.applications.filter(status=Application.Status.MATCHED).first()
+        profile = lead.matched_profile or default_candidate
+        if not profile:
+            errors.append(f"{lead.title}: No candidate profile associated with this lead.")
+            continue
+            
+        assert_ready_for_kit_generation(profile)
+        profile_data = profile.to_master_profile().to_storage_dict()
+        
         if not application:
             application = create_application_from_lead(lead, profile_snapshot=profile_data)
+            application.profile = profile
+            application.save(update_fields=["profile"])
             match_payload = (lead.ai_metadata or {}).get("match") or {}
             if match_payload:
                 application.record_match(
                     match_payload,
                     profile_snapshot=profile_data,
-                    thresholds=thresholds_for_candidate(candidate),
+                    thresholds=thresholds_for_candidate(profile),
                 )
+        else:
+            if not application.profile:
+                application.profile = profile
+                application.save(update_fields=["profile"])
+            profile_data = application.profile_snapshot or profile.to_master_profile().to_storage_dict()
+            
         try:
             assert_within_budget(float(getattr(settings, "ESTIMATED_KIT_COST_USD", 0.02)))
             ai = CareerAgentAI()
