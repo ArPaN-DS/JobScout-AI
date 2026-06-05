@@ -1133,9 +1133,12 @@ class AdditionalSubsystemTests(TestCase):
 
 class ProviderFallbackTests(TestCase):
     def setUp(self):
-        from core.models import ProviderConfig
+        from core.models import ProviderConfig, SecureCredential
         ProviderConfig.objects.all().delete()
+        SecureCredential.objects.all().delete()
         LLMRouter.reset_cooldowns()
+        SecureCredential.set_val("GEMINI_API_KEY", "mock-gemini-key")
+        SecureCredential.set_val("OPENAI_API_KEY", "mock-openai-key")
 
     def test_fallback_to_settings(self):
         chain = build_provider_chain(LLMTask.JOB_MATCH)
