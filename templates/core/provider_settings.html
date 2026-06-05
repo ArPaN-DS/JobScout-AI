@@ -1,113 +1,197 @@
 {% extends 'base.html' %}
 
 {% block title %}Provider Settings | AI Career Agent{% endblock %}
-{% block page_title %}Provider Settings{% endblock %}
+{% block page_title %}LLM Provider Settings{% endblock %}
 
 {% block content %}
-<div class="settings-grid">
-    <!-- Left column: Router Status -->
-    <div class="settings-col">
-        <section class="panel">
-            <div class="panel-header">
-                <div>
-                    <h2>LLM Provider Router</h2>
-                    <p class="subtitle">Active priority list for LLM queries. Providers are tried in order with automatic fallback if one fails.</p>
+<div class="settings-container">
+    <div class="settings-grid-layout">
+        <!-- Left Column: Draggable Provider Cards -->
+        <div class="settings-main-col">
+            <section class="panel">
+                <div class="panel-header flex justify-between items-center">
+                    <div>
+                        <h2>Provider Priority & Models</h2>
+                        <p class="subtitle">Drag cards to reorder fallback priority. Configure model list order for each provider.</p>
+                    </div>
                 </div>
-            </div>
 
-            <div class="table-wrap">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Provider</th>
-                            <th>Model</th>
-                            <th>Status</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for provider in provider_statuses %}
-                        <tr>
-                            <td><strong>{{ provider.name }}</strong></td>
-                            <td><code class="code-tag">{{ provider.model }}</code></td>
-                            <td>
-                                {% if provider.enabled %}
-                                <span class="status-pill success">Ready</span>
+                <div id="provider-cards-list" class="cards-list">
+                    {% for provider in providers %}
+                    <div class="provider-card" data-provider="{{ provider.provider_name }}" draggable="true">
+                        <!-- Drag Handle & Header -->
+                        <div class="card-header-row">
+                            <div class="drag-handle" title="Drag to reorder priority">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+                            </div>
+                            
+                            <div class="provider-title-section">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="provider-name">{{ provider.display_name }}</h3>
+                                    {% if provider.is_custom %}
+                                    <span class="custom-provider-tag">Custom</span>
+                                    {% endif %}
+                                </div>
+                                <span class="provider-slug">{{ provider.provider_name }}</span>
+                            </div>
+
+                            <!-- Credentials Badge -->
+                            <div class="credential-badge-container">
+                                {% if provider.has_db %}
+                                <span class="badge badge-db">Saved in DB</span>
+                                {% elif provider.has_env %}
+                                <span class="badge badge-env">From .env</span>
                                 {% else %}
-                                <span class="status-pill neutral">Off</span>
+                                <span class="badge badge-missing">Not configured</span>
                                 {% endif %}
-                            </td>
-                            <td class="text-muted">{{ provider.reason|default:"Configured and active" }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </div>
+                            </div>
 
-    <!-- Right column: Database Credentials Manager -->
-    <div class="settings-col">
-        <section class="panel">
-            <div class="panel-header">
-                <div>
-                    <h2>Configure Keys (Encrypted)</h2>
-                    <p class="subtitle">Manage API keys securely. Keys entered here are symmetrically encrypted in the local database at rest.</p>
-                </div>
-            </div>
-
-            <form method="post" action="{% url 'provider_settings' %}" class="keys-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="save_keys">
-                
-                <div class="form-grid">
-                    {% for key in key_configs %}
-                    <div class="form-group">
-                        <div class="form-label-row">
-                            <label class="form-label" for="id_{{ key.name }}">{{ key.label }}</label>
-                            <span class="source-badge">
-                                {% if key.has_db %}
-                                <span class="badge db">Saved in DB</span>
-                                {% elif key.has_env %}
-                                <span class="badge env">From .env file</span>
+                            <!-- Credit Status Badge -->
+                            <div class="credit-status-container" id="credit-badge-{{ provider.provider_name }}">
+                                {% if provider.credit_status == 'ok' %}
+                                <span class="status-indicator-pill ok">
+                                    <span class="dot"></span>
+                                    OK {% if provider.estimated_balance_usd != None %}(${{ provider.estimated_balance_usd|floatformat:2 }}){% endif %}
+                                </span>
+                                {% elif provider.credit_status == 'low' %}
+                                <span class="status-indicator-pill low">
+                                    <span class="dot"></span>
+                                    Low {% if provider.estimated_balance_usd != None %}(${{ provider.estimated_balance_usd|floatformat:2 }}){% endif %}
+                                </span>
+                                {% elif provider.credit_status == 'exhausted' %}
+                                <span class="status-indicator-pill exhausted">
+                                    <span class="dot"></span>
+                                    Exhausted
+                                </span>
                                 {% else %}
-                                <span class="badge missing">Not configured</span>
+                                <span class="status-indicator-pill unknown">
+                                    <span class="dot"></span>
+                                    Unknown
+                                </span>
                                 {% endif %}
-                            </span>
+                            </div>
+
+                            <!-- Enable toggle -->
+                            <div class="toggle-container">
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-{{ provider.provider_name }}" {% if provider.is_enabled %}checked{% endif %} onchange="toggleProviderEnabled('{{ provider.provider_name }}')">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
                         </div>
-                        <div class="input-group">
-                            <input type="password" 
-                                   name="{{ key.name }}" 
-                                   id="id_{{ key.name }}" 
-                                   class="form-input key-input" 
-                                   value="{{ key.display_val }}" 
-                                   placeholder="Enter API Key...">
-                            <button type="button" class="btn-toggle-visibility" onclick="toggleVisibility('id_{{ key.name }}')">
-                                Show
-                            </button>
+
+                        <!-- Card Body (Expandable Details) -->
+                        <div class="card-body-section">
+                            <div class="form-grid-two-col">
+                                <div class="form-item">
+                                    <label class="field-label">Models List (Priority order, comma-separated)</label>
+                                    <input type="text" id="models-{{ provider.provider_name }}" class="form-text-input" value="{{ provider.models|join:', ' }}" placeholder="e.g. gpt-4.1-mini, gpt-4.1">
+                                </div>
+                                <div class="form-item">
+                                    <label class="field-label">API Key Override</label>
+                                    <div class="password-input-group">
+                                        <input type="password" id="key-{{ provider.provider_name }}" class="form-text-input" value="{{ provider.display_val }}" placeholder="Enter API key override...">
+                                        <button type="button" class="btn-toggle" onclick="togglePasswordVisibility('key-{{ provider.provider_name }}')">Show</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-grid-two-col mt-3">
+                                <div class="form-item">
+                                    <label class="field-label">Custom Base URL (Optional)</label>
+                                    <input type="text" id="url-{{ provider.provider_name }}" class="form-text-input" value="{{ provider.base_url }}" placeholder="Default base url override">
+                                </div>
+                                <div class="action-buttons-cell flex justify-end items-end gap-2">
+                                    <button type="button" class="btn-action check" onclick="checkBalance('{{ provider.provider_name }}')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                        Check Balance
+                                    </button>
+                                    <button type="button" class="btn-action save" onclick="saveProviderSettings('{{ provider.provider_name }}')">
+                                        Save Card
+                                    </button>
+                                    {% if provider.is_custom %}
+                                    <button type="button" class="btn-action delete" onclick="deleteCustomProvider('{{ provider.provider_name }}')">
+                                        Delete
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
+            </section>
+        </div>
 
-                <div class="form-actions mt-6">
-                    <button type="submit" class="btn btn-primary w-full">Save Encrypted Credentials</button>
+        <!-- Right Column: Add Custom & Router Overview -->
+        <div class="settings-side-col">
+            <!-- Add Custom Provider Panel -->
+            <section class="panel mb-6">
+                <div class="panel-header">
+                    <h2>Add Custom LLM Endpoint</h2>
+                    <p class="subtitle">Integrate any OpenAI-compatible API gateway (e.g. Local vLLM, private endpoints).</p>
                 </div>
-            </form>
-        </section>
+                <form method="post" action="{% url 'provider_settings' %}" class="custom-provider-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_provider">
+                    
+                    <div class="form-group mb-3">
+                        <label class="field-label" for="add_display_name">Display Name</label>
+                        <input type="text" name="display_name" id="add_display_name" class="form-text-input" placeholder="e.g. Local DeepSeek" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="field-label" for="add_provider_name">Provider ID (slug)</label>
+                        <input type="text" name="provider_name" id="add_provider_name" class="form-text-input" placeholder="e.g. local_deepseek" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="field-label" for="add_models">Model Names (comma-separated)</label>
+                        <input type="text" name="models" id="add_models" class="form-text-input" placeholder="e.g. deepseek-coder, llama-3" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="field-label" for="add_base_url">Base URL</label>
+                        <input type="url" name="base_url" id="add_base_url" class="form-text-input" placeholder="e.g. http://localhost:8000/v1" required>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <label class="field-label" for="add_api_key">API Key (Optional)</label>
+                        <input type="password" name="api_key" id="add_api_key" class="form-text-input" placeholder="Enter endpoint API key...">
+                    </div>
+
+                    <button type="submit" class="btn-side-submit">Register Custom Endpoint</button>
+                </form>
+            </section>
+
+            <!-- Router Active Status Panel -->
+            <section class="panel">
+                <div class="panel-header">
+                    <h2>Live Router Output</h2>
+                    <p class="subtitle">Current raw configuration of the fallback chain.</p>
+                </div>
+                <div class="json-output-container">
+                    <pre class="json-code" id="raw-statuses-json">{{ provider_statuses_json }}</pre>
+                </div>
+            </section>
+        </div>
     </div>
 </div>
 
 <style>
-    .settings-grid {
+    .settings-container {
+        padding: 8px 0;
+    }
+
+    .settings-grid-layout {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1.6fr 1fr;
         gap: 24px;
         align-items: start;
     }
 
-    @media (max-width: 900px) {
-        .settings-grid {
+    @media (max-width: 1024px) {
+        .settings-grid-layout {
             grid-template-columns: 1fr;
         }
     }
@@ -118,145 +202,703 @@
         margin-top: 4px;
     }
 
-    .code-tag {
-        background: #f1f5f9;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 13px;
-        color: #334155;
-    }
-
-    .text-muted {
-        color: #64748b;
-        font-size: 13px;
-    }
-
-    /* Key Forms Style */
-    .keys-form {
-        padding: 10px 0;
-    }
-
-    .form-grid {
+    /* Cards List Container */
+    .cards-list {
         display: flex;
         flex-direction: column;
-        gap: 18px;
+        gap: 16px;
+        margin-top: 16px;
     }
 
-    .form-group {
+    /* Provider Card */
+    .provider-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        transition: all 0.25s ease;
+        position: relative;
+    }
+
+    .provider-card:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Drag & Drop Visual Classes */
+    .provider-card.dragging {
+        opacity: 0.4;
+        border: 2px dashed #6366f1;
+        background: #f8fafc;
+    }
+
+    .provider-card.drag-over {
+        border-top: 3px solid #6366f1;
+        padding-top: 18px;
+    }
+
+    /* Card Header Row */
+    .card-header-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .drag-handle {
+        cursor: grab;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+
+    .drag-handle:hover {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .provider-title-section {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .provider-name {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .provider-slug {
+        font-size: 12px;
+        color: #94a3b8;
+        font-family: monospace;
+    }
+
+    .custom-provider-tag {
+        font-size: 10px;
+        background: #fef3c7;
+        color: #d97706;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+
+    /* Badges */
+    .credential-badge-container {
+        display: flex;
+        align-items: center;
+    }
+
+    .badge {
+        font-size: 11px;
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 6px;
+    }
+
+    .badge-db {
+        background: rgba(129, 140, 248, 0.12);
+        color: #4f46e5;
+    }
+
+    .badge-env {
+        background: rgba(16, 185, 129, 0.1);
+        color: #059669;
+    }
+
+    .badge-missing {
+        background: rgba(239, 68, 68, 0.08);
+        color: #dc2626;
+    }
+
+    /* Credit Status Badges */
+    .status-indicator-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    .status-indicator-pill .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+
+    .status-indicator-pill.ok {
+        background: rgba(34, 197, 94, 0.12);
+        color: #166534;
+    }
+
+    .status-indicator-pill.ok .dot {
+        background: #22c55e;
+    }
+
+    .status-indicator-pill.low {
+        background: rgba(245, 158, 11, 0.12);
+        color: #92400e;
+    }
+
+    .status-indicator-pill.low .dot {
+        background: #f59e0b;
+    }
+
+    .status-indicator-pill.exhausted {
+        background: rgba(239, 68, 68, 0.12);
+        color: #991b1b;
+    }
+
+    .status-indicator-pill.exhausted .dot {
+        background: #ef4444;
+    }
+
+    .status-indicator-pill.unknown .dot {
+        background: #94a3b8;
+    }
+
+    /* Switch toggle */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #cbd5e1;
+        transition: .3s;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+    }
+
+    input:checked + .slider {
+        background-color: #4f46e5;
+    }
+
+    input:focus + .slider {
+        box-shadow: 0 0 1px #4f46e5;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(20px);
+    }
+
+    .slider.round {
+        border-radius: 34px;
+    }
+
+    .slider.round:before {
+        border-radius: 50%;
+    }
+
+    /* Expandable Body Section */
+    .card-body-section {
+        margin-top: 16px;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 16px;
+    }
+
+    .form-grid-two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+        .form-grid-two-col {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-item {
         display: flex;
         flex-direction: column;
         gap: 6px;
     }
 
-    .form-label-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .form-label {
-        font-size: 14px;
+    .field-label {
+        font-size: 12px;
         font-weight: 600;
-        color: #334155;
+        color: #475569;
     }
 
-    .source-badge .badge {
-        font-size: 11px;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-weight: 500;
+    .form-text-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
     }
 
-    .source-badge .badge.db {
-        background: rgba(129, 140, 248, 0.15);
-        color: #4f46e5;
+    .form-text-input:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
     }
 
-    .source-badge .badge.env {
-        background: rgba(16, 185, 129, 0.1);
-        color: #059669;
-    }
-
-    .source-badge .badge.missing {
-        background: rgba(239, 68, 68, 0.08);
-        color: #dc2626;
-    }
-
-    .input-group {
+    .password-input-group {
         display: flex;
         position: relative;
     }
 
-    .form-input {
-        width: 100%;
-        padding: 10px 12px;
-        padding-right: 60px;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        font-size: 14px;
-        outline: none;
-        transition: border-color 0.2s;
+    .password-input-group .form-text-input {
+        padding-right: 50px;
     }
 
-    .form-input:focus {
-        border-color: #6366f1;
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
-    }
-
-    .btn-toggle-visibility {
+    .btn-toggle {
         position: absolute;
         right: 8px;
         top: 50%;
         transform: translateY(-50%);
         background: none;
         border: none;
-        color: #6366f1;
-        cursor: pointer;
-        font-size: 12px;
+        color: #4f46e5;
+        font-size: 11px;
         font-weight: 600;
-        padding: 4px 8px;
+        cursor: pointer;
     }
 
-    .btn-toggle-visibility:hover {
-        text-decoration: underline;
-    }
-
-    .btn-primary {
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        color: white;
-        border: none;
+    /* Card Actions Buttons */
+    .btn-action {
+        padding: 8px 14px;
         border-radius: 8px;
-        padding: 12px;
-        font-size: 15px;
+        font-size: 13px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
-        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.15);
+        border: 1px solid transparent;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
 
-    .btn-primary:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 14px rgba(124, 58, 237, 0.25);
+    .btn-action.check {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        color: #475569;
     }
+
+    .btn-action.check:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+    }
+
+    .btn-action.save {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: white;
+    }
+
+    .btn-action.save:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(124, 58, 237, 0.2);
+    }
+
+    .btn-action.delete {
+        background: #fef2f2;
+        color: #991b1b;
+        border-color: #fee2e2;
+    }
+
+    .btn-action.delete:hover {
+        background: #fee2e2;
+    }
+
+    /* Add custom provider side block */
+    .btn-side-submit {
+        width: 100%;
+        padding: 10px;
+        background: #0f172a;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn-side-submit:hover {
+        background: #1e293b;
+    }
+
+    /* Raw statuses JSON code */
+    .json-output-container {
+        background: #0f172a;
+        border-radius: 8px;
+        padding: 12px;
+        max-height: 350px;
+        overflow: auto;
+    }
+
+    .json-code {
+        margin: 0;
+        color: #38bdf8;
+        font-family: monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+    }
+
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .justify-end { justify-content: flex-end; }
+    .items-end { align-items: flex-end; }
+    .gap-2 { gap: 8px; }
+    .mt-3 { margin-top: 12px; }
+    .mt-4 { margin-top: 16px; }
+    .mb-3 { margin-bottom: 12px; }
+    .mb-4 { margin-bottom: 16px; }
+    .mb-6 { margin-bottom: 24px; }
+    .w-full { width: 100%; }
 </style>
 
 <script>
-    function toggleVisibility(inputId) {
+    // Drag and Drop implementation
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('provider-cards-list');
+        const cards = container.querySelectorAll('.provider-card');
+
+        cards.forEach(card => {
+            card.addEventListener('dragstart', handleDragStart);
+            card.addEventListener('dragend', handleDragEnd);
+        });
+
+        container.addEventListener('dragover', e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(container, e.clientY);
+            const draggable = document.querySelector('.dragging');
+            if (draggable) {
+                if (afterElement == null) {
+                    container.appendChild(draggable);
+                } else {
+                    container.insertBefore(draggable, afterElement);
+                }
+            }
+        });
+    });
+
+    let dragSourceEl = null;
+
+    function handleDragStart(e) {
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', this.dataset.provider);
+    }
+
+    function handleDragEnd(e) {
+        this.classList.remove('dragging');
+        saveNewOrder();
+    }
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.provider-card:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    function saveNewOrder() {
+        const container = document.getElementById('provider-cards-list');
+        const cards = [...container.querySelectorAll('.provider-card')];
+        const order = cards.map(card => card.dataset.provider);
+
+        fetch("{% url 'provider_settings' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                action: "reorder",
+                order: order
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast("Fallback priority order updated successfully.", "info");
+                // Update live router output
+                refreshLiveOutput();
+            } else {
+                showToast("Failed to save reorder: " + data.error, "error");
+            }
+        })
+        .catch(err => {
+            showToast("Failed to save reorder: " + err, "error");
+        });
+    }
+
+    function togglePasswordVisibility(inputId) {
         const input = document.getElementById(inputId);
         const btn = input.nextElementSibling;
-        
-        if (input.type === "password") {
-            input.type = "text";
-            btn.textContent = "Hide";
-            // If it is the default placeholder, clean it to allow typing fresh key
-            if (input.value.startsWith("••••")) {
-                input.value = "";
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.textContent = 'Hide';
+            if (input.value.startsWith('••••')) {
+                input.value = '';
             }
         } else {
-            input.type = "password";
-            btn.textContent = "Show";
+            input.type = 'password';
+            btn.textContent = 'Show';
         }
+    }
+
+    function toggleProviderEnabled(providerName) {
+        const toggle = document.getElementById('toggle-' + providerName);
+        const isEnabled = toggle.checked;
+
+        // Perform AJAX save for quick toggle
+        fetch("{% url 'provider_settings' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                action: "save_provider",
+                provider_name: providerName,
+                is_enabled: isEnabled,
+                models: document.getElementById('models-' + providerName).value,
+                base_url: document.getElementById('url-' + providerName).value,
+                api_key: document.getElementById('key-' + providerName).value
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`${providerName} ${isEnabled ? 'enabled' : 'disabled'}.`, "info");
+                refreshLiveOutput();
+            } else {
+                showToast("Error updating state: " + data.error, "error");
+                toggle.checked = !isEnabled; // Revert
+            }
+        })
+        .catch(err => {
+            showToast("Error updating state: " + err, "error");
+            toggle.checked = !isEnabled; // Revert
+        });
+    }
+
+    function saveProviderSettings(providerName) {
+        const isEnabled = document.getElementById('toggle-' + providerName).checked;
+        const models = document.getElementById('models-' + providerName).value;
+        const key = document.getElementById('key-' + providerName).value;
+        const url = document.getElementById('url-' + providerName).value;
+
+        fetch("{% url 'provider_settings' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                action: "save_provider",
+                provider_name: providerName,
+                is_enabled: isEnabled,
+                models: models,
+                base_url: url,
+                api_key: key
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(`${providerName} settings saved successfully.`, "success");
+                refreshLiveOutput();
+                // If the key was typed fresh, reload page after a short delay to mask it in UI
+                if (key && !key.startsWith('••••')) {
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            } else {
+                showToast("Failed to save settings: " + data.error, "error");
+            }
+        })
+        .catch(err => {
+            showToast("Failed to save settings: " + err, "error");
+        });
+    }
+
+    function checkBalance(providerName) {
+        const badge = document.getElementById('credit-badge-' + providerName);
+        badge.innerHTML = `<span class="status-indicator-pill unknown"><span class="dot"></span>Checking...</span>`;
+
+        fetch("{% url 'provider_settings' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                action: "check_balance",
+                provider_name: providerName
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                let badgeClass = data.credit_status;
+                let text = data.credit_status.toUpperCase();
+                if (data.balance !== null) {
+                    text += ` ($${data.balance.toFixed(2)})`;
+                }
+                
+                badge.innerHTML = `
+                    <span class="status-indicator-pill ${badgeClass}">
+                        <span class="dot"></span>
+                        ${text}
+                    </span>
+                `;
+                
+                if (data.simulated) {
+                    showToast(`${providerName} balance check simulated: $${data.balance.toFixed(2)}.`, "info");
+                } else {
+                    showToast(`${providerName} balance verified.`, "success");
+                }
+                refreshLiveOutput();
+            } else {
+                badge.innerHTML = `<span class="status-indicator-pill unknown"><span class="dot"></span>Failed</span>`;
+                showToast("Balance check failed: " + data.error, "error");
+            }
+        })
+        .catch(err => {
+            badge.innerHTML = `<span class="status-indicator-pill unknown"><span class="dot"></span>Error</span>`;
+            showToast("Balance check failed: " + err, "error");
+        });
+    }
+
+    function deleteCustomProvider(providerName) {
+        if (!confirm(`Are you sure you want to delete custom provider "${providerName}"?`)) {
+            return;
+        }
+
+        fetch("{% url 'provider_settings' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                action: "delete_provider",
+                provider_name: providerName
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast("Provider deleted.", "success");
+                setTimeout(() => window.location.reload(), 600);
+            } else {
+                showToast("Deletion failed: " + data.error, "error");
+            }
+        })
+        .catch(err => {
+            showToast("Deletion failed: " + err, "error");
+        });
+    }
+
+    function refreshLiveOutput() {
+        // Fetch raw statuses update endpoint to render live router JSON (can hit standard fetch of provider-status)
+        fetch("/jobs/provider-status/")
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.provider_statuses) {
+                document.getElementById('raw-statuses-json').textContent = JSON.stringify(data.provider_statuses, null, 2);
+            }
+        })
+        .catch(e => console.error("Error refreshing live output:", e));
+    }
+
+    // Stub for Toast notifications if base template doesn't provide it
+    function showToast(message, type = "info") {
+        if (window.toast) {
+            window.toast(message, type);
+            return;
+        }
+        // Fallback UI toast
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.style.position = 'fixed';
+            container.style.bottom = '20px';
+            container.style.right = '20px';
+            container.style.zIndex = '9999';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.gap = '10px';
+            document.body.appendChild(container);
+        }
+
+        const toast = document.createElement('div');
+        toast.style.padding = '12px 20px';
+        toast.style.borderRadius = '8px';
+        toast.style.color = 'white';
+        toast.style.fontSize = '13px';
+        toast.style.fontWeight = '600';
+        toast.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)';
+        toast.style.transition = 'opacity 0.3s';
+        
+        if (type === 'success') toast.style.background = '#10b981';
+        else if (type === 'error') toast.style.background = '#ef4444';
+        else if (type === 'warning') toast.style.background = '#f59e0b';
+        else toast.style.background = '#3b82f6';
+
+        toast.textContent = message;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 </script>
 {% endblock %}
