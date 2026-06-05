@@ -186,6 +186,17 @@ All output received from LLMs is validated using Pydantic models (e.g., `MasterP
 - If an LLM returns malformed JSON, Pydantic raises a validation error, prompting the system to retry.
 - **Grounded Verification**: The tailored output is checked against the candidate's original profile claims to prevent the LLM from fabricating experience (hallucinations).
 
+### D. Provider Configuration & Quota Monitoring Subsystem (`core/credit_checker.py` + `ProviderConfig`)
+To prevent system failures when an API key runs out of quota/credits or billing expires:
+- **Dynamic Config**: Managed through the `ProviderConfig` model, each provider has priority, status, adapter type, base URL override, and enabled/disabled states.
+- **Credit Checker**: Located in `core/credit_checker.py`, this module validates API key availability and checks for keywords indicating quota or credit exhaustion (e.g., `insufficient_quota`, `exceeded your current quota`, `out of credits`).
+- **Auto-Cooldown**: If quota exhaustion is detected, the provider is marked as exhausted and placed on a 1-hour cooldown. During this time, `is_available()` returns `False` and the router falls back to the next prioritized provider.
+
+### E. Multi-Profile Partitioning
+To allow applicants to apply for multiple roles or career tracks simultaneously:
+- **Profile Association**: Each `JobLead` and `Application` is associated with a specific `CandidateProfile` via foreign key links (`matched_profile` and `profile`).
+- **Context Isolation**: When background discovery or tailoring runs, the operations are isolated to the specific profile selected by the user, ensuring resumes and matching criteria are never crossed or blended between target roles.
+
 ---
 
 ## 5. Sequence Diagram: Core Request Lifecycle
