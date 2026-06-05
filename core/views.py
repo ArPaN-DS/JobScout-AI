@@ -125,6 +125,13 @@ def _preferences_data(request) -> dict:
         "min_match_confidence": request.POST.get("min_match_confidence", "").strip(),
         "job_freshness_hours": request.POST.get("job_freshness_hours", "").strip(),
         "discovery_sources": _csv_list(request.POST.get("discovery_sources", "")),
+        "resume_theme": request.POST.get("resume_theme", "").strip(),
+        "resume_font_size": request.POST.get("resume_font_size", "").strip(),
+        "resume_line_height": request.POST.get("resume_line_height", "").strip(),
+        "resume_margin_top": request.POST.get("resume_margin_top", "").strip(),
+        "resume_margin_bottom": request.POST.get("resume_margin_bottom", "").strip(),
+        "resume_margin_left": request.POST.get("resume_margin_left", "").strip(),
+        "resume_margin_right": request.POST.get("resume_margin_right", "").strip(),
     }
 
 
@@ -231,10 +238,11 @@ def job_discovery(request):
             app_record.record_match(
                 match_data,
                 profile_snapshot=master_profile.to_storage_dict(),
-                ai_metadata=ai.last_metadata(),
+                ai_metadata=safe_json_dict(ai.last_metadata()),
                 thresholds=thresholds,
             )
 
+            meta = safe_json_dict(ai.last_metadata())
             return JsonResponse(
                 {
                     "success": True,
@@ -245,6 +253,9 @@ def job_discovery(request):
                         "min_match_score": thresholds.min_match_score,
                         "min_match_confidence": thresholds.min_match_confidence,
                     },
+                    "provider_used": meta.get("provider"),
+                    "model_used": meta.get("model"),
+                    "switch_event": meta.get("switch_event"),
                 }
             )
         except Exception as exc:
@@ -295,6 +306,9 @@ def generate_kit(request):
                 "data": kit_data,
                 "metadata": kit_metadata,
                 "budget": budget_status(),
+                "provider_used": kit_metadata.get("provider"),
+                "model_used": kit_metadata.get("model"),
+                "switch_event": kit_metadata.get("switch_event"),
             }
         )
     except Exception as exc:
@@ -318,68 +332,284 @@ def mark_submitted(request):
         return json_error(exc, status=_exception_status(exc))
 
 
+def seed_default_provider_configs():
+    import os
+    from django.conf import settings
+    from .models import ProviderConfig, SecureCredential
+    if ProviderConfig.objects.exists():
+        return
+
+    def env_bool(name: str, default: bool = False) -> bool:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+
+    defaults = [
+        {
+            "provider_name": "gemini",
+            "display_name": "Google Gemini",
+            "api_key_name": "GEMINI_API_KEY",
+            "adapter_type": "gemini",
+            "models": ["gemini-2.5-flash", "gemini-2.5-pro"],
+            "base_url": "",
+        },
+        {
+            "provider_name": "openai",
+            "display_name": "OpenAI",
+            "api_key_name": "OPENAI_API_KEY",
+            "adapter_type": "openai_compatible",
+            "models": ["gpt-4.1-mini", "gpt-4.1"],
+            "base_url": "https://api.openai.com/v1",
+        },
+        {
+            "provider_name": "anthropic",
+            "display_name": "Anthropic Claude",
+            "api_key_name": "ANTHROPIC_API_KEY",
+            "adapter_type": "anthropic",
+            "models": ["claude-3-5-haiku-latest"],
+            "base_url": "",
+        },
+        {
+            "provider_name": "groq",
+            "display_name": "Groq",
+            "api_key_name": "GROQ_API_KEY",
+            "adapter_type": "openai_compatible",
+            "models": ["llama-3.3-70b-versatile"],
+            "base_url": "https://api.groq.com/openai/v1",
+        },
+        {
+            "provider_name": "openrouter",
+            "display_name": "OpenRouter",
+            "api_key_name": "OPENROUTER_API_KEY",
+            "adapter_type": "openai_compatible",
+            "models": ["openrouter/auto"],
+            "base_url": "https://openrouter.ai/api/v1",
+            "extra_headers": {
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "Job_bro_AI",
+            },
+        },
+        {
+            "provider_name": "xai",
+            "display_name": "xAI Grok",
+            "api_key_name": "XAI_API_KEY",
+            "adapter_type": "openai_compatible",
+            "models": ["grok-3-mini"],
+            "base_url": "https://api.x.ai/v1",
+        },
+        {
+            "provider_name": "deepseek",
+            "display_name": "DeepSeek",
+            "api_key_name": "DEEPSEEK_API_KEY",
+            "adapter_type": "openai_compatible",
+            "models": ["deepseek-chat"],
+            "base_url": "https://api.deepseek.com",
+        },
+        {
+            "provider_name": "kimi",
+            "display_name": "Moonshot Kimi",
+            "api_key_name": "MOONSHOT_API_KEY",
+            "adapter_type": "openai_compatible",
+            "models": ["kimi-k2.5"],
+            "base_url": "https://api.moonshot.ai/v1",
+        },
+        {
+            "provider_name": "qwen",
+            "display_name": "Alibaba Qwen",
+            "api_key_name": "DASHSCOPE_API_KEY",
+            "adapter_type": "openai_compatible",
+            "models": ["qwen-plus"],
+            "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        },
+        {
+            "provider_name": "ollama",
+            "display_name": "Ollama (Local)",
+            "api_key_name": "OLLAMA_ENABLED",
+            "adapter_type": "ollama",
+            "models": ["llama3.1"],
+            "base_url": "http://localhost:11434",
+        },
+    ]
+
+    order = getattr(settings, "LLM_PROVIDER_ORDER", [])
+    order_map = {name: idx for idx, name in enumerate(order)}
+
+    for item in defaults:
+        provider_name = item["provider_name"]
+        priority = order_map.get(provider_name, len(order) + 10)
+        has_key = bool(SecureCredential.get_val(item["api_key_name"]) or os.getenv(item["api_key_name"]))
+        is_enabled = has_key if provider_name != "ollama" else env_bool("OLLAMA_ENABLED", False)
+
+        ProviderConfig.objects.create(
+            provider_name=provider_name,
+            display_name=item["display_name"],
+            api_key_name=item["api_key_name"],
+            adapter_type=item["adapter_type"],
+            models=item["models"],
+            base_url=item["base_url"],
+            extra_headers=item.get("extra_headers", {}),
+            priority=priority,
+            is_enabled=is_enabled,
+        )
+
+
 @require_http_methods(["GET", "POST"])
 def provider_settings(request):
-    from .models import SecureCredential
-    
-    keys_to_manage = [
-        ("GEMINI_API_KEY", "Google Gemini API Key"),
-        ("OPENAI_API_KEY", "OpenAI API Key"),
-        ("ANTHROPIC_API_KEY", "Anthropic Claude API Key"),
-        ("GROQ_API_KEY", "Groq API Key"),
-        ("OPENROUTER_API_KEY", "OpenRouter API Key"),
-        ("XAI_API_KEY", "xAI Grok API Key"),
-        ("DEEPSEEK_API_KEY", "DeepSeek API Key"),
-    ]
-    
+    import os
+    import json
+    from django.http import JsonResponse
+    from .models import SecureCredential, ProviderConfig
+    from .llm import LLMRouter, provider_statuses
+    from .credit_checker import check_balance
+
+    seed_default_provider_configs()
+
     if request.method == "POST":
         action = request.POST.get("action", "")
-        if action == "save_keys":
-            for key_name, _ in keys_to_manage:
-                val = request.POST.get(key_name, "").strip()
-                # If they passed a placeholder like "••••••••", it means they didn't edit it
-                if val and not val.startswith("••••"):
-                    SecureCredential.set_val(key_name, val)
-                elif val == "":
-                    # If they explicitly emptied the field, remove the key from database
-                    SecureCredential.delete_key = SecureCredential.set_val(key_name, "")
-            
-            # Reset cooldowns on key update to try again immediately
-            from .llm import LLMRouter
+        if not action:
+            # Check if JSON payload
+            try:
+                payload = json.loads(request.body.decode("utf-8") or "{}")
+                action = payload.get("action", "")
+            except Exception:
+                payload = {}
+        else:
+            payload = {}
+
+        if action == "save_provider":
+            p_name = request.POST.get("provider_name") or payload.get("provider_name")
+            if not p_name:
+                return json_error("Provider name missing.", status=400)
+
+            try:
+                config = ProviderConfig.objects.get(provider_name=p_name)
+            except ProviderConfig.DoesNotExist:
+                return json_error("Provider not found.", status=404)
+
+            is_enabled_val = request.POST.get("is_enabled") or payload.get("is_enabled")
+            config.is_enabled = is_enabled_val in (True, "1", "on", "true")
+
+            models_raw = request.POST.get("models") or payload.get("models", "")
+            if isinstance(models_raw, str):
+                models_list = [m.strip() for m in models_raw.split(",") if m.strip()]
+            else:
+                models_list = list(models_raw or [])
+            config.models = models_list
+
+            base_url_val = request.POST.get("base_url") or payload.get("base_url", "")
+            config.base_url = base_url_val.strip()
+
+            api_key = request.POST.get("api_key") or payload.get("api_key", "")
+            api_key = api_key.strip()
+            if api_key and not api_key.startswith("••••"):
+                SecureCredential.set_val(config.api_key_name, api_key)
+
+            config.save()
             LLMRouter.reset_cooldowns()
+
+            if request.headers.get("x-requested-with") == "XMLHttpRequest" or request.content_type == "application/json":
+                return JsonResponse({"success": True, "message": f"{config.display_name} saved."})
             return redirect("provider_settings")
-            
-    # Compile key status
-    key_configs = []
-    for key_name, label in keys_to_manage:
-        db_val = SecureCredential.get_val(key_name)
-        env_val = os.getenv(key_name)
-        
-        has_db = bool(db_val)
-        has_env = bool(env_val)
-        
-        display_val = ""
-        if has_db:
-            display_val = "••••••••" + db_val[-4:] if len(db_val) > 4 else "••••••••"
-        elif has_env:
-            display_val = "••••••••" + env_val[-4:] if len(env_val) > 4 else "••••••••"
-            
-        key_configs.append({
-            "name": key_name,
-            "label": label,
-            "has_db": has_db,
-            "has_env": has_env,
-            "display_val": display_val,
-        })
-        
+
+        elif action == "reorder":
+            try:
+                if not payload:
+                    payload = json.loads(request.body.decode("utf-8") or "{}")
+                order = payload.get("order", [])
+                for idx, p_name in enumerate(order):
+                    ProviderConfig.objects.filter(provider_name=p_name).update(priority=idx)
+                LLMRouter.reset_cooldowns()
+                return JsonResponse({"success": True, "message": "Order updated."})
+            except Exception as e:
+                return json_error(str(e), status=400)
+
+        elif action == "check_balance":
+            p_name = request.POST.get("provider_name") or payload.get("provider_name")
+            if not p_name:
+                return json_error("Provider name missing.", status=400)
+            try:
+                config = ProviderConfig.objects.get(provider_name=p_name)
+            except ProviderConfig.DoesNotExist:
+                return json_error("Provider not found.", status=404)
+
+            res = check_balance(config)
+            if res.get("ok"):
+                bal = res.get("balance")
+                config.mark_credit_ok(balance=bal)
+                return JsonResponse({
+                    "success": True,
+                    "balance": bal,
+                    "simulated": res.get("simulated", False),
+                    "credit_status": config.credit_status,
+                })
+            else:
+                return json_error(res.get("error", "Balance check failed."))
+
+        elif action == "add_provider":
+            p_name = request.POST.get("provider_name", "").strip().lower()
+            d_name = request.POST.get("display_name", "").strip()
+            if not p_name or not d_name:
+                return json_error("Provider name and display name are required.", status=400)
+
+            api_key = request.POST.get("api_key", "").strip()
+            key_name = f"CUSTOM_{p_name.upper()}_API_KEY"
+            if api_key:
+                SecureCredential.set_val(key_name, api_key)
+
+            models_raw = request.POST.get("models", "")
+            models_list = [m.strip() for m in models_raw.split(",") if m.strip()]
+
+            max_priority = ProviderConfig.objects.all().count()
+
+            config = ProviderConfig.objects.create(
+                provider_name=p_name,
+                display_name=d_name,
+                api_key_name=key_name,
+                adapter_type="openai_compatible",
+                models=models_list,
+                base_url=request.POST.get("base_url", "").strip(),
+                priority=max_priority,
+                is_enabled=True,
+            )
+            return redirect("provider_settings")
+
+        elif action == "delete_provider":
+            p_name = request.POST.get("provider_name") or payload.get("provider_name")
+            try:
+                config = ProviderConfig.objects.get(provider_name=p_name)
+                if config.api_key_name.startswith("CUSTOM_"):
+                    SecureCredential.set_val(config.api_key_name, "")
+                    config.delete()
+                    return JsonResponse({"success": True, "message": "Provider deleted."})
+                else:
+                    return json_error("Cannot delete default provider.", status=400)
+            except ProviderConfig.DoesNotExist:
+                return json_error("Provider not found.", status=404)
+
+    configs = list(ProviderConfig.objects.all().order_by("priority"))
     statuses = [status.__dict__ for status in provider_statuses()]
+
+    for config in configs:
+        db_val = SecureCredential.get_val(config.api_key_name)
+        env_val = os.getenv(config.api_key_name)
+        config.has_db = bool(db_val)
+        config.has_env = bool(env_val)
+        config.is_custom = config.api_key_name.startswith("CUSTOM_")
+        if db_val:
+            config.display_val = "••••••••" + db_val[-4:] if len(db_val) > 4 else "••••••••"
+        elif env_val:
+            config.display_val = "••••••••" + env_val[-4:] if len(env_val) > 4 else "••••••••"
+        else:
+            config.display_val = ""
+
     return render(
         request,
         "core/provider_settings.html",
         {
+            "providers": configs,
             "provider_statuses": statuses,
             "provider_statuses_json": json.dumps(statuses, indent=2),
-            "key_configs": key_configs,
         },
     )
 
@@ -578,7 +808,7 @@ def import_job(request):
             ai = CareerAgentAI()
             match = ai.match_job_to_profile(master_profile, lead.description)
             match_data = match.model_dump(mode="json")
-            lead.record_score(match_data, ai_metadata=ai.last_metadata(), thresholds=thresholds)
+            lead.record_score(match_data, ai_metadata=safe_json_dict(ai.last_metadata()), thresholds=thresholds)
             if thresholds.is_strong_match(match.match_score, match.confidence):
                 application = create_application_from_lead(
                     lead,
@@ -587,7 +817,7 @@ def import_job(request):
                 application.record_match(
                     match_data,
                     profile_snapshot=master_profile.to_storage_dict(),
-                    ai_metadata=ai.last_metadata(),
+                    ai_metadata=safe_json_dict(ai.last_metadata()),
                     thresholds=thresholds,
                 )
         except Exception as exc:
@@ -596,7 +826,18 @@ def import_job(request):
             lead.save(update_fields=["status", "error_message", "updated_at"])
             return json_error(exc, status=_exception_status(exc))
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
-        return JsonResponse({"success": True, "created": created, "lead_id": lead.id})
+        resp = {"success": True, "created": created, "lead_id": lead.id}
+        if score_now and len(lead.description) >= 80:
+            try:
+                meta = safe_json_dict(ai.last_metadata())
+                resp.update({
+                    "provider_used": meta.get("provider"),
+                    "model_used": meta.get("model"),
+                    "switch_event": meta.get("switch_event"),
+                })
+            except Exception:
+                pass
+        return JsonResponse(resp)
     return redirect("job_queue")
 
 
@@ -873,4 +1114,108 @@ def verify_qa_item(request):
         return JsonResponse({"success": True, "message": "Q&A verified successfully."})
     except CandidateQuestionAnswer.DoesNotExist:
         return json_error("Q&A item not found.", status=404)
+
+
+@require_http_methods(["GET"])
+def application_detail(request, app_id):
+    try:
+        app_record = Application.objects.get(id=app_id)
+    except Application.DoesNotExist:
+        return redirect("applications_dashboard")
+        
+    profile = app_record.profile or get_active_candidate()
+    
+    # Retrieve claims to check for citations side-by-side
+    claims = []
+    if profile:
+        claims = profile.claims.filter(
+            category__in=["experience", "skill", "evidence_note"]
+        ).order_by("category", "value")
+        
+    context = {
+        "application": app_record,
+        "profile": profile,
+        "claims": claims,
+        "claims_json": json.dumps([
+            {"category": c.category, "value": c.value, "normalized": c.normalized_value}
+            for c in claims
+        ]),
+        "has_profile": bool(profile),
+    }
+    context.update(_workflow_context(profile))
+    return render(request, "core/application_detail.html", context)
+
+
+@require_POST
+def update_application_kit(request, app_id):
+    try:
+        app_record = Application.objects.get(id=app_id)
+    except Application.DoesNotExist:
+        return json_error("Application record not found.", status=404)
+        
+    profile = app_record.profile or get_active_candidate()
+    if not profile:
+        return json_error("No active candidate profile.", status=400)
+        
+    cover_letter = request.POST.get("cover_letter", "").strip()
+    recruiter_message = request.POST.get("recruiter_message", "").strip()
+    follow_up_message = request.POST.get("follow_up_message", "").strip()
+    tailored_resume_json_str = request.POST.get("tailored_resume_json", "").strip()
+    
+    try:
+        app_record.cover_letter = cover_letter
+        app_record.recruiter_message = recruiter_message
+        app_record.follow_up_message = follow_up_message
+        
+        if tailored_resume_json_str:
+            tailored_resume = json.loads(tailored_resume_json_str)
+            # Basic validation of format
+            if not isinstance(tailored_resume, dict) or "experience" not in tailored_resume:
+                return json_error("Invalid tailored resume JSON structure.", status=400)
+            app_record.tailored_resume = tailored_resume
+            
+        app_record.save()
+        
+        # Compile PDF resume dynamically
+        from .resume_tailor import compile_tailored_resume_to_pdf
+        import asyncio
+        
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        pdf_path = loop.run_until_complete(compile_tailored_resume_to_pdf(app_record, profile))
+        app_record.tailored_resume_pdf = pdf_path
+        app_record.save(update_fields=["tailored_resume_pdf"])
+        
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True, 
+                "message": "Application kit updated and PDF regenerated successfully.",
+                "pdf_url": settings.MEDIA_URL + pdf_path
+            })
+        return redirect("application_detail", app_id=app_id)
+    except Exception as exc:
+        return json_error(exc, status=400)
+
+
+def provider_status_api(request):
+    from .llm import provider_statuses
+    statuses = [status.__dict__ for status in provider_statuses()]
+    active_provider = "None"
+    active_model = "None"
+    for status in statuses:
+        if status.get("enabled"):
+            active_provider = status.get("name")
+            active_model = status.get("model")
+            break
+    return JsonResponse({
+        "success": True,
+        "provider_statuses": statuses,
+        "active_provider": active_provider,
+        "active_model": active_model,
+    })
+
 
