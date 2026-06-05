@@ -138,6 +138,91 @@ class JobSourceConnector:
 # TIER 1: JOBSPY (LinkedIn, Indeed, Glassdoor, Google Jobs)
 # 
 
+def fetch_search_results_via_playwright_fallback(url: str, source_name: str) -> list[dict]:
+    """
+    Launches Playwright, navigates to the search URL, gets the text,
+    and uses Gemini to extract a list of jobs in JSON format.
+    """
+    from playwright.sync_api import sync_playwright
+    
+    print(f"   [Playwright Fallback] Scraping search page: {url}...")
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+            )
+            page = context.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=25000)
+            
+            # Scroll down to trigger lazy loading
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight/2)")
+            page.wait_for_timeout(2000)
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(2000)
+            
+            body_text = page.locator("body").inner_text()
+            browser.close()
+            
+            if len(body_text.strip()) < 150:
+                return []
+                
+            prompt = f"""
+Analyze the raw text content of a job search page below and extract a list of up to 10 job postings.
+
+Return ONLY a JSON array of objects. Do not include markdown wraps or code blocks.
+Each object must have the following structure:
+{{
+  "title": "Role Title",
+  "company": "Company Name",
+  "location": "Location (e.g. India or hybrid or remote)",
+  "description": "Short summary of the role",
+  "apply_url": "Full direct job posting URL or link if found",
+  "source": "{source_name}",
+  "posted": "Date posted (e.g., 24 hours ago, recent)"
+}}
+
+If the URL is relative, prepend the base domain of {url}.
+
+Page text content:
+{body_text[:12000]}
+"""
+            from .llm import LLMRouter, LLMRequest, LLMTask
+            router = LLMRouter()
+            result = router.generate(
+                LLMRequest(
+                    task=LLMTask.JOB_EXTRACT,
+                    prompt=prompt,
+                    temperature=0.1,
+                    response_mime_type="application/json"
+                )
+            )
+            
+            import json
+            raw_text = result.text.strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:]
+            elif raw_text.startswith("```"):
+                raw_text = raw_text[3:]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+            raw_text = raw_text.strip()
+            
+            parsed = json.loads(raw_text)
+            if isinstance(parsed, list):
+                return parsed
+            elif isinstance(parsed, dict) and "jobs" in parsed:
+                return parsed["jobs"]
+            return []
+    except Exception as e:
+        print(f"   [Playwright Fallback] Error scraping {source_name}: {e}")
+        return []
+
+
+# 
+# TIER 1: JOBSPY (LinkedIn, Indeed, Glassdoor, Google Jobs)
+# 
+
 def search_jobspy(query: str, hours_old: int = 24, sites: list = None) -> list[dict]:
     """Search via jobspy  LinkedIn, Indeed, Glassdoor, Google Jobs."""
     if not circuit_breaker.is_available("jobspy"):
@@ -157,6 +242,9 @@ def search_jobspy(query: str, hours_old: int = 24, sites: list = None) -> list[d
             hours_old=hours_old,
             country_indeed="India",
         )
+        if results.empty:
+            raise ValueError("No jobs found via scrape_jobs")
+            
         for _, row in results.iterrows():
             if row.get("job_url") and row.get("title"):
                 jobs.append({
@@ -171,7 +259,10 @@ def search_jobspy(query: str, hours_old: int = 24, sites: list = None) -> list[d
         circuit_breaker.record_success("jobspy")
     except Exception as e:
         circuit_breaker.record_failure("jobspy", str(e))
-        print(f"   jobspy error for '{query}': {e}")
+        print(f"   jobspy error for '{query}': {e}. Trying Playwright fallback...")
+        query_slug = query.replace(" ", "+")
+        search_url = f"https://www.linkedin.com/jobs/search/?keywords={query_slug}"
+        jobs = fetch_search_results_via_playwright_fallback(search_url, "LinkedIn")
 
     return jobs
 
@@ -199,10 +290,13 @@ def search_naukri(query: str) -> list[dict]:
         
         response = fetcher.get(url, headers=headers, timeout=15)
         if response.status_code != 200:
-            return jobs
+            raise ValueError(f"Fetcher status code: {response.status_code}")
 
         # Scrapling parses into response elements automatically
         cards = response.css("article.job-tuple, article.jobTuple")[:15]
+        if not cards:
+            raise ValueError("No cards found via Scrapling Fetcher")
+            
         for card in cards:
             try:
                 title_el = card.css("a.title, a.jobTitle, h2.title")
@@ -229,7 +323,10 @@ def search_naukri(query: str) -> list[dict]:
         circuit_breaker.record_success("naukri")
     except Exception as e:
         circuit_breaker.record_failure("naukri", str(e))
-        print(f"   Naukri error: {e}")
+        print(f"   Naukri error: {e}. Trying Playwright fallback...")
+        query_slug = query.replace(" ", "-").lower()
+        search_url = f"https://www.naukri.com/{query_slug}-jobs-in-india"
+        jobs = fetch_search_results_via_playwright_fallback(search_url, "Naukri")
 
     return jobs
 
