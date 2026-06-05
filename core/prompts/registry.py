@@ -94,6 +94,7 @@ Grounding rules:
 - Use exact skill strings from candidate_profile.skills. Do not create new skill names.
 - Use exact company, role, and duration values from candidate_profile.experience.
 - You may rephrase existing highlights for clarity, but you may not add new tools, metrics, employers, dates, or outcomes.
+- For each rephrased highlight, you MUST include the exact original experiences or notes from the profile that support it under the "evidence_refs" array.
 - If the job asks for a missing skill, do not include it in the resume.
 
 JSON shape:
@@ -106,7 +107,8 @@ JSON shape:
         "company": "Exact company from profile",
         "role": "Exact role from profile",
         "duration": "Exact duration from profile",
-        "highlights": ["Rephrased but evidence-backed highlight"]
+        "highlights": ["Rephrased but evidence-backed highlight"],
+        "evidence_refs": ["Exact original experience highlight text or note that supports the rephrased highlight"]
       }}
     ]
   }},
