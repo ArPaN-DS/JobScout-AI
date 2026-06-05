@@ -76,6 +76,45 @@
                     <option value="document" {% if preferences and preferences.resume_source == "document" %}selected{% endif %}>Uploaded Document (Static Master)</option>
                 </select>
             </div>
+            
+            <div class="input-field">
+                <label for="resume_theme">Resume PDF Theme</label>
+                <select id="resume_theme" name="resume_theme" style="width: 100%; border: 1px solid var(--border); border-radius: 8px; background: #ffffff; color: var(--ink); padding: 11px 12px; outline: none; transition: border-color var(--transition), box-shadow var(--transition);">
+                    <option value="modern_sans" {% if preferences and preferences.resume_theme == "modern_sans" %}selected{% endif %}>Modern Sans (Indigo Accent)</option>
+                    <option value="classic_serif" {% if preferences and preferences.resume_theme == "classic_serif" %}selected{% endif %}>Classic Serif (Georgia)</option>
+                    <option value="minimalist" {% if preferences and preferences.resume_theme == "minimalist" %}selected{% endif %}>Minimalist Monospace (Courier)</option>
+                </select>
+            </div>
+            
+            <div class="input-field">
+                <label for="resume_font_size">Font Size (pt)</label>
+                <input type="number" step="0.1" id="resume_font_size" name="resume_font_size" value="{{ preferences.resume_font_size|default:10.5 }}">
+            </div>
+            
+            <div class="input-field">
+                <label for="resume_line_height">Line Height</label>
+                <input type="number" step="0.05" id="resume_line_height" name="resume_line_height" value="{{ preferences.resume_line_height|default:1.35 }}">
+            </div>
+            
+            <div class="input-field">
+                <label for="resume_margin_top">Margin Top (in)</label>
+                <input type="number" step="0.05" id="resume_margin_top" name="resume_margin_top" value="{{ preferences.resume_margin_top|default:0.75 }}">
+            </div>
+            
+            <div class="input-field">
+                <label for="resume_margin_bottom">Margin Bottom (in)</label>
+                <input type="number" step="0.05" id="resume_margin_bottom" name="resume_margin_bottom" value="{{ preferences.resume_margin_bottom|default:0.75 }}">
+            </div>
+            
+            <div class="input-field">
+                <label for="resume_margin_left">Margin Left (in)</label>
+                <input type="number" step="0.05" id="resume_margin_left" name="resume_margin_left" value="{{ preferences.resume_margin_left|default:0.75 }}">
+            </div>
+            
+            <div class="input-field">
+                <label for="resume_margin_right">Margin Right (in)</label>
+                <input type="number" step="0.05" id="resume_margin_right" name="resume_margin_right" value="{{ preferences.resume_margin_right|default:0.75 }}">
+            </div>
         </div>
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">Save Preferences</button>
