@@ -837,8 +837,7 @@ class ProviderConfig(models.Model):
     def mark_credit_ok(self, balance=None):
         self.credit_status = self.CreditStatus.OK
         self.credit_exhausted_at = None
-        if balance is not None:
-            self.estimated_balance_usd = balance
+        self.estimated_balance_usd = balance
         self.last_balance_check = timezone.now()
         self.save(
             update_fields=[
