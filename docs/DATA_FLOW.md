@@ -367,3 +367,100 @@ sequenceDiagram
     deactivate Router
 ```
 
+---
+
+## 8. LLM Provider Balance Check and Quota Exception Cooldown Flow
+
+This sequence details how the system checks provider credit balances and handles runtime quota exceptions (insufficient credits/billing limits) by putting the provider on a cooldown and falling back to alternatives.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant AI as core.ai_service (CareerAgentAI)
+    participant Router as core.llm (LLMRouter)
+    participant Config as core.models (ProviderConfig)
+    participant Checker as core.credit_checker
+    participant API as LLM Endpoint (Gemini/OpenAI)
+    participant DB as Database (SQLite)
+
+    Note over AI,Router: Part A: Runtime Call with Quota Check & Fallback
+    AI->>Router: request_structured_completion(prompt, Schema)
+    activate Router
+    Router->>Config: Get enabled providers ordered by priority
+    activate Config
+    Config-->>Router: List of ProviderConfigs (e.g. Gemini, OpenAI)
+    deactivate Config
+
+    loop For each provider in order
+        Router->>Config: Is provider available? (is_available())
+        activate Config
+        Note over Config: Checks is_enabled=True AND NOT in credit cooldown
+        Config-->>Router: True / False
+        deactivate Config
+
+        alt Provider is available
+            Router->>API: Call API with credentials
+            activate API
+            
+            alt API returns Success
+                API-->>Router: Valid response data
+                Router-->>AI: Valid response payload
+            else API returns Quota/Billing Error (429/402)
+                API-->>Router: Error Exception (e.g. "insufficient_quota")
+                deactivate API
+                
+                Router->>Checker: is_credit_exhausted_error(error_message)
+                activate Checker
+                Checker-->>Router: True (exhausted)
+                deactivate Checker
+                
+                Router->>Config: mark_credit_exhausted()
+                activate Config
+                Config->>DB: Set credit_status = EXHAUSTED, credit_exhausted_at = now
+                Config-->>Router: Done
+                deactivate Config
+                
+                Note over Router: Tripped! Cooldown for 1 hour active. Continue loop for fallback.
+            end
+        end
+    end
+    deactivate Router
+
+    Note over Checker,DB: Part B: Balance Checking Scheduled / Manual Verification
+    actor Operator as Operator (Browser)
+    participant View as core.views.provider_settings
+
+    Operator->>View: GET /settings/providers/check-balances/
+    activate View
+    View->>Config: Fetch active ProviderConfigs
+    activate Config
+    Config-->>View: List of configurations
+    deactivate Config
+
+    loop For each configuration
+        View->>Checker: check_balance(provider_config)
+        activate Checker
+        Checker->>DB: Fetch encrypted API key
+        DB-->>Checker: Ciphertext key
+        Checker-->>View: Balance details (e.g., {"ok": True, "balance": 10.0})
+        deactivate Checker
+
+        alt Balance > 0
+            View->>Config: mark_credit_ok(balance)
+            activate Config
+            Config->>DB: Set credit_status = OK, estimated_balance = balance, credit_exhausted_at = None
+            Config-->>View: Done
+            deactivate Config
+        else Balance is 0 (Exhausted)
+            View->>Config: mark_credit_exhausted()
+            activate Config
+            Config->>DB: Set credit_status = EXHAUSTED
+            Config-->>View: Done
+            deactivate Config
+        end
+    end
+
+    View-->>Operator: Render status results and balances
+    deactivate View
+```
+
