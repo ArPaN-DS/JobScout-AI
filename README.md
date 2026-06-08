@@ -34,6 +34,11 @@
 
 ## ◆ Modular System Architecture
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Architecture-Decoupled--MVT-blueviolet" alt="MVT Architecture">
+  <img src="https://img.shields.io/badge/Data--Pipeline-Scrape--to--Tailor-blue" alt="Data Pipeline">
+</p>
+
 JobScout-AI uses a decoupled, local-first engine. The flowchart below maps the entire ingestion, scoring, and multi-agent tailoring pipeline:
 
 ```mermaid
@@ -55,6 +60,22 @@ graph TD
     M -->|No: Re-tailor| K
     M -->|Yes: Save| N[ApplicationKit Saved]
     N -->|User Dashboard| O[Review, Edit & Export]
+
+    style A fill:#ffe8cc,stroke:#ff922b,stroke-width:2px,color:#000
+    style B fill:#ffe8cc,stroke:#ff922b,stroke-width:2px,color:#000
+    style C fill:#ffe8cc,stroke:#ff922b,stroke-width:2px,color:#000
+    style D fill:#ffe8cc,stroke:#ff922b,stroke-width:2px,color:#000
+    style E fill:#f3d9fa,stroke:#cc5de8,stroke-width:2px,color:#000
+    style F fill:#f3d9fa,stroke:#cc5de8,stroke-width:2px,color:#000
+    style G fill:#f3d9fa,stroke:#cc5de8,stroke-width:2px,color:#000
+    style H fill:#e7f5ff,stroke:#228be6,stroke-width:2px,color:#000
+    style I fill:#e7f5ff,stroke:#228be6,stroke-width:2px,color:#000
+    style J fill:#e7f5ff,stroke:#228be6,stroke-width:2px,color:#000
+    style K fill:#e6fcf5,stroke:#20c997,stroke-width:2px,color:#000
+    style L fill:#e6fcf5,stroke:#20c997,stroke-width:2px,color:#000
+    style M fill:#e6fcf5,stroke:#20c997,stroke-width:2px,color:#000
+    style N fill:#e6fcf5,stroke:#20c997,stroke-width:2px,color:#000
+    style O fill:#fff0f6,stroke:#f783ac,stroke-width:2px,color:#000
 ```
 
 ---
@@ -113,7 +134,7 @@ sequenceDiagram
 
 ## ◆ Resilient LLM Router & Circuit Breaker
 
-Scraping and external APIs fail often. JobScout-AI uses a custom fallback chain with automated rate-limit detection and cool-downs to prevent execution blocks:
+JobScout-AI uses a custom fallback chain with automated rate-limit detection and cool-downs to prevent execution blocks:
 
 ```mermaid
 graph LR
@@ -131,6 +152,17 @@ graph LR
     E -->|No| J[Local Ollama Offline Mode]
     I -->|Success| F
     J -->|Success| F
+
+    style A fill:#f1f3f5,stroke:#868e96,stroke-width:2px,color:#000
+    style B fill:#f1f3f5,stroke:#868e96,stroke-width:2px,color:#000
+    style C fill:#e7f5ff,stroke:#228be6,stroke-width:2px,color:#000
+    style D fill:#e7f5ff,stroke:#228be6,stroke-width:2px,color:#000
+    style E fill:#e7f5ff,stroke:#228be6,stroke-width:2px,color:#000
+    style F fill:#ebfbee,stroke:#40c057,stroke-width:2px,color:#000
+    style G fill:#fff5f5,stroke:#fa5252,stroke-width:2px,color:#000
+    style H fill:#fff5f5,stroke:#fa5252,stroke-width:2px,color:#000
+    style I fill:#ebfbee,stroke:#40c057,stroke-width:2px,color:#000
+    style J fill:#ebfbee,stroke:#40c057,stroke-width:2px,color:#000
 ```
 
 ---
@@ -145,6 +177,13 @@ Placeholders for application interfaces:
 ---
 
 ## ◆ Frictionless Installation & Setup
+
+<p align="left">
+  <img src="https://img.shields.io/badge/OS-Windows-brightgreen" alt="Windows">
+  <img src="https://img.shields.io/badge/OS-macOS-brightgreen" alt="macOS">
+  <img src="https://img.shields.io/badge/OS-Linux-brightgreen" alt="Linux">
+  <img src="https://img.shields.io/badge/Setup-One--Click-blue" alt="One-Click Setup">
+</p>
 
 JobScout-AI is designed to run locally on your machine. We provide one-command onboarding scripts to automate the setup.
 
