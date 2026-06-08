@@ -57,6 +57,7 @@ verification.sqlite3*
 staticfiles/
 static/collected/
 media/
+media/browser_sessions/
 tmp_uploads/
 temp_uploads/
 uploads/

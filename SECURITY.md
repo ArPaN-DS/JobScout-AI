@@ -1,32 +1,55 @@
-# Security Policy
+# Security Policy for JobScout-AI 🔒
 
-Job_bro_AI is local-first software that can process sensitive candidate data: resumes, employment history, contact details, job preferences, private application drafts, channel IDs, and LLM API keys. Treat every local deployment as a private data system.
+We take the security of your private career data, API credentials, and application materials very seriously. Since **JobScout-AI** operates locally on your machine, securing your environment is a shared responsibility.
 
-## Public Repository Rules
+---
 
-- Never commit `.env`, local databases, uploaded documents, generated drafts, screenshots containing private data, or profile exports.
-- Keep provider credentials in environment variables only.
-- Use `.env.example` for placeholders and documentation, never for real values.
-- Rotate any key that was ever pasted into a local file, terminal transcript, screenshot, issue, or commit.
-- Keep local virtual environments ignored.
+## 🛑 Public Repository Security Rules
 
-## Runtime Defaults
+To protect your personal data, never share or commit:
+- Your local `.env` file (contains LLM API keys and secrets).
+- Your local SQLite database `db.sqlite3` (contains candidate resumes, logs, and profile info).
+- Exported JSON profile data.
+- Uploaded resumes or generated application drafts (`tmp_uploads/` or `media/browser_sessions/`).
 
-- `AUTO_SUBMIT_ENABLED=false` must remain the public default.
-- LLM providers are opt-in through user-owned keys.
-- Telegram and Discord integrations must use allowlists.
-- Debug mode is acceptable only for local development.
+*If you accidentally commit any secrets or API keys, rotate them immediately!*
 
-## Before Hosting Publicly
+---
 
-- Set `DJANGO_DEBUG=false`.
-- Set a long random `DJANGO_SECRET_KEY`.
-- Restrict `DJANGO_ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS`.
-- Use HTTPS and secure cookies.
-- Run `python manage.py check --deploy`.
-- Add authentication, authorization, and per-user data isolation before allowing multiple users.
-- Decide whether external LLM providers are acceptable for the data being processed.
+## 🛡️ Supported Versions
 
-## Reporting Security Issues
+Security updates are actively applied to the following versions:
 
-Use the repository's private security advisory flow if available, or contact the maintainer through a private channel. Do not open a public issue containing secrets, personal data, logs with credentials, resumes, or generated private application material.
+| Version | Supported |
+| :--- | :--- |
+| **v1.x (Active)** | Yes (Latest updates and patches) |
+| **v0.x (Deprecated)** | No (Please upgrade to v1.x) |
+
+---
+
+## 📢 How to Report a Security Vulnerability
+
+If you discover a security bug or potential vulnerability in **JobScout-AI**, please **do not open a public GitHub issue**. Doing so exposes users to risk before a patch can be developed.
+
+Instead, please report vulnerabilities privately:
+
+### 1. GitHub Private Security Advisory (Preferred)
+Navigate to the **Security** tab of our GitHub repository, select **Advisories**, and click **Report a vulnerability**. This allows us to discuss and patch the issue in a secure environment.
+
+### 2. Direct Private Contact
+Alternatively, if the private advisory flow is unavailable, contact the primary maintainer directly at the security channel listed in the repository settings or email `arpan@example.com` (using GPG encryption if possible).
+
+---
+
+## ⚙️ Secure Deployment Checklist
+
+Before exposing a JobScout-AI server over a local area network (LAN) or hosting it on a VPS:
+1. Set `DJANGO_DEBUG=false` in your `.env`.
+2. Generate a secure, 50+ character `DJANGO_SECRET_KEY` using `python generate_keys.py`.
+3. Set `FIELD_ENCRYPTION_KEY` to encrypt API keys stored in the database.
+4. Restrict `DJANGO_ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` to trusted domains only.
+5. Enable HTTPS and secure cookies.
+6. Verify your setup by running the deployment security checks:
+   ```bash
+   python manage.py check --deploy
+   ```
