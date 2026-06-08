@@ -32,7 +32,34 @@
 
 ---
 
-## 🤖 The AI Agent & QualityCritic Self-Correction Loop
+## 🧱 Modular System Architecture
+
+JobScout-AI uses a decoupled, local-first engine. The flowchart below maps the entire ingestion, scoring, and multi-agent tailoring pipeline:
+
+```mermaid
+graph TD
+    A[Job Boards / Pasted URLs] -->|Ingestion| B[JobSourceRun Ingestor]
+    B -->|Deduplication| C[Job Fingerprint Check]
+    C -->|New Leads| D[JobLead Queue]
+    D -->|Match Request| E[Resilient LLM Router]
+    E -->|Scoring Engine| F[MatchResult Scorer]
+    F -->|High Match| G[Auto-Queue Dashboard]
+    
+    H[Candidate Resume/DOCX] -->|Parser| I[MasterProfile Parser]
+    I -->|Store| J[Local SQLite Database]
+    
+    G -->|Generation Trigger| K[TailoringExpert Agent]
+    J -->|Skills Grounding| K
+    K -->|Draft Materials| L[QualityCritic Agent]
+    L -->|Audit & Verify| M{Approved?}
+    M -->|No: Re-tailor| K
+    M -->|Yes: Save| N[ApplicationKit Saved]
+    N -->|User Dashboard| O[Review, Edit & Export]
+```
+
+---
+
+## 🤖 The QualityCritic Self-Correction Loop
 
 To guarantee that AI-tailored resumes and cover letters match your **actual** skills (and don't invent false credentials), JobScout-AI runs a strict, multi-agent self-correction cycle. 
 
@@ -84,6 +111,30 @@ sequenceDiagram
 
 ---
 
+## ⚡ Resilient LLM Router & Circuit Breaker
+
+Scraping and external APIs fail often. JobScout-AI uses a custom fallback chain with automated rate-limit detection and cool-downs to prevent execution blocks:
+
+```mermaid
+graph LR
+    A[Generate Request] --> B[LLM Router]
+    B -->|Check Active| C{Gemini Active?}
+    C -->|Yes| D[Call Gemini API]
+    C -->|No: On Cooldown| E{Groq/OpenAI Active?}
+    
+    D -->|Success| F[Return JSON]
+    D -->|Quota/Rate Limit Error| G[Trigger Circuit Breaker]
+    G -->|Put on Cooldown 1 Hr| H[Gemini Suspended]
+    H -->|Failover Route| E
+    
+    E -->|Yes| I[Call Fallback Provider]
+    E -->|No| J[Local Ollama Offline Mode]
+    I -->|Success| F
+    J -->|Success| F
+```
+
+---
+
 ## 📸 Dashboard Preview
 
 Placeholders for application interfaces (visualize premium UI and logging tools):
@@ -93,9 +144,12 @@ Placeholders for application interfaces (visualize premium UI and logging tools)
 
 ---
 
-## ⚙️ Frictionless 15-Minute Setup
+## ⚙️ Frictionless Installation & Setup
 
-JobScout-AI is designed to run locally on your machine. We provide one-command onboarding scripts to automate the installation.
+JobScout-AI is designed to run locally on your machine. We provide one-command onboarding scripts to automate the setup.
+
+<details>
+<summary><b>🚀 Click here to expand Step-by-Step Local Setup Instructions</b></summary>
 
 ### Prerequisites
 - **Python 3.11 or newer** installed.
@@ -150,10 +204,14 @@ Log in using the default developer credentials:
 * **Password:** `admin123`
 
 *(Please update your password in the Django Admin panel under `/admin` if hosting on a local network).*
+</details>
 
 ---
 
 ## 📂 Core Folder Structure
+
+<details>
+<summary><b>📂 Click here to expand Repository File Map</b></summary>
 
 - [`career_agent/`](file:///d:/Job_finder_AI/career_agent/): Django project settings, deployment rules, and root URL routing.
 - [`core/`](file:///d:/Job_finder_AI/core/): Main career engine application directory.
@@ -163,6 +221,7 @@ Log in using the default developer credentials:
   - [`core/sources/`](file:///d:/Job_finder_AI/core/sources/): Extensible scraping adapters (LinkedIn, Indeed, etc.).
 - [`templates/`](file:///d:/Job_finder_AI/templates/): Responsive HTML5 dashboard templates.
 - [`static/`](file:///d:/Job_finder_AI/static/): Client-side styles, charts, and interactive scripts.
+</details>
 
 ---
 
