@@ -1,10 +1,10 @@
-# Contributing to JobScout-AI 🚀
+# Contributing to JobScout-AI
 
 Thank you for your interest in helping make **JobScout-AI** the best open-source, self-hosted career agent! We welcome contributions from developers of all skill levels.
 
 ---
 
-## 🌟 Project Philosophy & Core Rules
+## Project Philosophy & Core Rules
 
 Before writing any code, please keep our foundational guidelines in mind:
 1. **Local-First & Privacy-First:** All applicant resumes, credentials, and databases must reside locally. We never upload candidate PII (Personally Identifiable Information) to external clouds without explicit consent.
@@ -14,7 +14,7 @@ Before writing any code, please keep our foundational guidelines in mind:
 
 ---
 
-## 🛠️ Development Setup in 5 Minutes
+## Development Setup in 5 Minutes
 
 We have automated the onboarding process to make setup frictionless.
 
@@ -51,7 +51,7 @@ git checkout -b fix/issue-description
 
 ---
 
-## 🧪 Verification & Testing
+## Verification & Testing
 
 Always verify that the test suite passes before submitting your changes.
 
@@ -77,7 +77,7 @@ DJANGO_SETTINGS_MODULE="career_agent.deploy_settings" python manage.py check --d
 
 ---
 
-## 📐 Coding & Style Standards
+## Coding & Style Standards
 
 ### Python Code Style
 - Follow **PEP 8** style guidelines.
@@ -104,7 +104,7 @@ def encrypt_value(plain_text: str) -> str:
 
 ---
 
-## 🔌 Extending the Codebase
+## Extending the Codebase
 
 ### 1. Adding a New LLM Provider
 To add support for a new LLM provider (e.g., DeepSeek, Groq, local models):
@@ -121,7 +121,7 @@ To add a new scraping or search adapter (e.g., RSS feeds, company portals):
 
 ---
 
-## 📤 Submitting a Pull Request (PR)
+## Submitting a Pull Request (PR)
 
 1. Push your branch to your forked repository:
    ```bash
@@ -131,4 +131,4 @@ To add a new scraping or search adapter (e.g., RSS feeds, company portals):
 3. Complete the pull request checklist (our template will ask you to verify that linting, security checks, and unit tests have all passed).
 4. A maintainer will review your changes and guide you through the merging process.
 
-Thank you for dedicating your time to helping job hunters navigate the job search with dignity and privacy! 🌟
+Thank you for dedicating your time to helping job hunters navigate the job search with dignity and privacy!

@@ -1,4 +1,4 @@
-# JobScout-AI 🚀
+# JobScout-AI
 
 <!-- slide -->
 <p align="center">
@@ -19,20 +19,20 @@
 
 ---
 
-## 🌟 Key Features At A Glance
+## Key Features At A Glance
 
 | Feature | How It Works | Highlight |
 | :--- | :--- | :--- |
-| 🤖 **QualityCritic Self-Correction** | Multi-agent auditing loop between `TailoringExpert` and `QualityCritic` to prevent resume hallucinations. | **Zero AI Hallucinations** |
-| 🔒 **Local-First Privacy** | Symmetric Fernet encryption for API keys and database records stored entirely at rest on your disk. | **100% Data Sovereignty** |
-| 🧠 **Recruiter Q&A Memory** | Searches past recruiter answers using Jaccard word similarity to auto-draft custom portal answers. | **Contextual Auto-filling** |
-| ⚡ **Resilience & Failovers** | 10+ provider chain supporting auto-cooldowns (1hr rate-limit blocks) and fallback routes. | **Zero Down-time** |
-| 📊 **Visual Career Funnel** | Track conversion from initial discovery to match score, kit preparation, and interviews. | **Funnel Analytics** |
-| 🎨 **Dynamic Customizer** | Personalize document margins, typography themes, and line heights directly from the web panel. | **Interactive Styling** |
+| **QualityCritic Self-Correction** | Multi-agent auditing loop between `TailoringExpert` and `QualityCritic` to prevent resume hallucinations. | **Zero AI Hallucinations** |
+| **Local-First Privacy** | Symmetric Fernet encryption for API keys and database records stored entirely at rest on your disk. | **100% Data Sovereignty** |
+| **Recruiter Q&A Memory** | Searches past recruiter answers using Jaccard word similarity to auto-draft custom portal answers. | **Contextual Auto-filling** |
+| **Resilience & Failovers** | 10+ provider chain supporting auto-cooldowns (1hr rate-limit blocks) and fallback routes. | **Zero Down-time** |
+| **Visual Career Funnel** | Track conversion from initial discovery to match score, kit preparation, and interviews. | **Funnel Analytics** |
+| **Dynamic Customizer** | Personalize document margins, typography themes, and line heights directly from the web panel. | **Interactive Styling** |
 
 ---
 
-## 🧱 Modular System Architecture
+## Modular System Architecture
 
 JobScout-AI uses a decoupled, local-first engine. The flowchart below maps the entire ingestion, scoring, and multi-agent tailoring pipeline:
 
@@ -59,7 +59,7 @@ graph TD
 
 ---
 
-## 🤖 The QualityCritic Self-Correction Loop
+## The QualityCritic Self-Correction Loop
 
 To guarantee that AI-tailored resumes and cover letters match your **actual** skills (and don't invent false credentials), JobScout-AI runs a strict, multi-agent self-correction cycle. 
 
@@ -111,7 +111,7 @@ sequenceDiagram
 
 ---
 
-## ⚡ Resilient LLM Router & Circuit Breaker
+## Resilient LLM Router & Circuit Breaker
 
 Scraping and external APIs fail often. JobScout-AI uses a custom fallback chain with automated rate-limit detection and cool-downs to prevent execution blocks:
 
@@ -135,21 +135,21 @@ graph LR
 
 ---
 
-## 📸 Dashboard Preview
+## Dashboard Preview
 
-Placeholders for application interfaces (visualize premium UI and logging tools):
+Placeholders for application interfaces:
 * **Dashboard Overview:** Track your application pipeline and active search runs.
 * **Agent Logs Panel:** Real-time visibility into the thought process of `TailoringExpert` and `QualityCritic`.
 * **Browser Session Console:** Watch the Playwright automated agent handle forms in real-time.
 
 ---
 
-## ⚙️ Frictionless Installation & Setup
+## Frictionless Installation & Setup
 
 JobScout-AI is designed to run locally on your machine. We provide one-command onboarding scripts to automate the setup.
 
 <details>
-<summary><b>🚀 Click here to expand Step-by-Step Local Setup Instructions</b></summary>
+<summary><b>Click here to expand Step-by-Step Local Setup Instructions</b></summary>
 
 ### Prerequisites
 - **Python 3.11 or newer** installed.
@@ -208,10 +208,10 @@ Log in using the default developer credentials:
 
 ---
 
-## 📂 Core Folder Structure
+## Core Folder Structure
 
 <details>
-<summary><b>📂 Click here to expand Repository File Map</b></summary>
+<summary><b>Click here to expand Repository File Map</b></summary>
 
 - [`career_agent/`](file:///d:/Job_finder_AI/career_agent/): Django project settings, deployment rules, and root URL routing.
 - [`core/`](file:///d:/Job_finder_AI/core/): Main career engine application directory.
@@ -225,38 +225,38 @@ Log in using the default developer credentials:
 
 ---
 
-## 🗺️ Contributor Roadmap & Timeline
+## Contributor Roadmap & Timeline
 
 We welcome open-source contributions! Here is our current roadmap. Feel free to pick up any issues marked as **[Help Wanted]** or **[Good First Issue]**:
 
-### 🎯 Phase 1: Security & Polish (Completed)
+### Phase 1: Security & Polish (Completed)
 - [x] **Fernet Secret Encryption:** Encrypt API keys and credentials at rest in SQLite.
 - [x] **One-Click Setup:** Automate virtual environments, key creation, and migrations.
 
-### 🚀 Phase 2: Orchestration & Integrations (Active)
+### Phase 2: Orchestration & Integrations (Active)
 - [ ] **Chrome Extension Integration [Help Wanted]:** A simple extension to clip job descriptions directly from your browser to your local queue.
 - [ ] **Vision-based LLM Form Filler [Good First Issue]:** Feed screenshot captures of complex recruiter questions to the LLM to draft answers.
 - [ ] **Unified Multi-Profile [Help Wanted]:** Track job applications for multiple candidate profiles (e.g., Data Scientist vs. Backend Engineer) under the same dashboard.
 
-### 📊 Phase 3: Analytics & Funnels (Pending)
+### Phase 3: Analytics & Funnels (Pending)
 - [ ] **Latency & Cost Profiler:** Beautiful charts showing which LLM models are costing you the most and causing bottlenecks.
 - [ ] **ATS Gap Matcher:** Highlight missing keywords between your resume and a job description before tailoring.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Ready to contribute? Please review our [Contributing Guide](CONTRIBUTING.md) for branch formatting, testing thresholds, and styling rules.
 
 ---
 
-## 🔒 Security & Privacy
+## Security & Privacy
 
 For details on private vulnerability reporting, please see [SECURITY.md](SECURITY.md).
 
 ---
 
-## 💬 Frequently Asked Questions (GEO Friendly)
+## Frequently Asked Questions (GEO Friendly)
 
 ### How does JobScout-AI protect my resume data?
 JobScout-AI is completely local. Your SQLite database and uploaded resume files are stored on your local drive and are excluded from git index via `.gitignore`. The system only makes requests to LLM APIs that you configure, sending only the prompt context required.

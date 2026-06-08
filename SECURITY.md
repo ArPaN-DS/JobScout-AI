@@ -1,10 +1,10 @@
-# Security Policy for JobScout-AI 🔒
+# Security Policy for JobScout-AI
 
 We take the security of your private career data, API credentials, and application materials very seriously. Since **JobScout-AI** operates locally on your machine, securing your environment is a shared responsibility.
 
 ---
 
-## 🛑 Public Repository Security Rules
+## Public Repository Security Rules
 
 To protect your personal data, never share or commit:
 - Your local `.env` file (contains LLM API keys and secrets).
@@ -16,7 +16,7 @@ To protect your personal data, never share or commit:
 
 ---
 
-## 🛡️ Supported Versions
+## Supported Versions
 
 Security updates are actively applied to the following versions:
 
@@ -27,7 +27,7 @@ Security updates are actively applied to the following versions:
 
 ---
 
-## 📢 How to Report a Security Vulnerability
+## How to Report a Security Vulnerability
 
 If you discover a security bug or potential vulnerability in **JobScout-AI**, please **do not open a public GitHub issue**. Doing so exposes users to risk before a patch can be developed.
 
@@ -41,7 +41,7 @@ Alternatively, if the private advisory flow is unavailable, contact the primary 
 
 ---
 
-## ⚙️ Secure Deployment Checklist
+## Secure Deployment Checklist
 
 Before exposing a JobScout-AI server over a local area network (LAN) or hosting it on a VPS:
 1. Set `DJANGO_DEBUG=false` in your `.env`.
