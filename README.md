@@ -1,7 +1,7 @@
 # JobScout-AI 🚀
 
 <!-- slide -->
-![JobScout-AI Banner](https://raw.githubusercontent.com/ArPaN-DS/JobScout-AI/main/docs/images/jobscout_banner.png)
+![JobScout-AI Banner](docs/images/jobscout_banner.png)
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue?style=for-the-badge&logo=python" alt="Python 3.11+">
