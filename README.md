@@ -2,7 +2,7 @@
 
 <!-- slide -->
 <p align="center">
-  <img src="docs/images/jobscout_banner.png" alt="JobScout-AI Banner" width="500">
+  <img src="docs/images/jobscout_banner.png" alt="JobScout-AI Banner" width="100%">
 </p>
 
 <p align="center">
