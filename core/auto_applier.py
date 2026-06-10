@@ -71,6 +71,19 @@ async def create_stealth_browser(
         **context_options
     )
 
+    # Load custom cookies if available to bypass login gates (e.g. LinkedIn / Naukri)
+    cookies_dir = Path(getattr(settings, "MEDIA_ROOT", settings.BASE_DIR / "media")) / "browser_sessions" / "cookies"
+    cookies_dir.mkdir(parents=True, exist_ok=True)
+    cookie_file = cookies_dir / f"{profile_name}.json"
+    if cookie_file.exists():
+        try:
+            with open(cookie_file, "r") as f:
+                cookies = json.load(f)
+            await context.add_cookies(cookies)
+            print(f"  [AutoApply] Loaded session cookies for {profile_name}")
+        except Exception as e:
+            print(f"  [AutoApply] Failed to load session cookies: {e}")
+
     page = context.pages[0] if context.pages else await context.new_page()
     
     # Apply stealth scripts
@@ -254,7 +267,12 @@ async def extract_form_fields(page: Page) -> List[Dict[str, Any]]:
                                 el.id || '';
                     }
                     
+                    // Assign a unique attribute to target the element directly during filling
+                    const uuid = 'field_' + Math.random().toString(36).substr(2, 9);
+                    el.setAttribute('data-jobscout-id', uuid);
+                    
                     const field = {
+                        jobscout_id: uuid,
                         tag: el.tagName.toLowerCase(),
                         type: el.type || 'text',
                         name: el.name || el.id || '',
@@ -323,7 +341,7 @@ async def smart_fill_form(fields: List[Dict[str, Any]], profile: Dict[str, Any])
         label = f.get("label") or ""
         name = f.get("name") or ""
         placeholder = f.get("placeholder") or ""
-        key = f.get("name") or f.get("id")
+        key = f.get("name") or f.get("id") or f.get("jobscout_id")
         if not key:
             continue
 
@@ -395,7 +413,8 @@ async def smart_fill_form(fields: List[Dict[str, Any]], profile: Dict[str, Any])
     if custom_questions_to_draft:
         field_descriptions = []
         for f in custom_questions_to_draft:
-            desc = f"- Field name/id='{f.get('name') or f.get('id')}', label='{f.get('label', '')}', placeholder='{f.get('placeholder', '')}'"
+            f_key = f.get("name") or f.get("id") or f.get("jobscout_id")
+            desc = f"- Field key='{f_key}', label='{f.get('label', '')}', placeholder='{f.get('placeholder', '')}'"
             if f.get("options"):
                 opts = [o["text"] for o in f["options"][:6]]
                 desc += f", options={opts}"
@@ -414,7 +433,7 @@ CUSTOM FORM FIELDS TO FILL:
 {chr(10).join(field_descriptions)}
 
 Draft professional, highly tailored, and truthful answers based ONLY on the candidate profile. Do not invent details.
-Return ONLY a valid JSON object mapping the field name/id to the drafted answer string.
+Return ONLY a valid JSON object mapping the field key to the drafted answer string.
 IMPORTANT: Return ONLY raw JSON, no markdown formatting (no ```json)."""
 
         try:
@@ -429,30 +448,22 @@ IMPORTANT: Return ONLY raw JSON, no markdown formatting (no ```json)."""
             )
             text = result.text.strip()
             
-            # Clean JSON markdown if present
-            if text.startswith("```json"):
-                text = text[7:]
-            elif text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-
-            drafted_answers = json.loads(text)
+            from .ai_service import extract_json_object
+            drafted_answers = extract_json_object(text)
             
             # Update mapping and persist the drafted answers to the Q&A memory database
             for f in custom_questions_to_draft:
-                key = f.get("name") or f.get("id")
-                drafted_val = drafted_answers.get(key)
+                f_key = f.get("name") or f.get("id") or f.get("jobscout_id")
+                drafted_val = drafted_answers.get(f_key)
                 if drafted_val:
-                    mapping[key] = drafted_val
+                    mapping[f_key] = drafted_val
                     
                     # Save as unverified draft
                     if profile_db:
                         try:
                             label_val = f.get("label") or ""
                             placeholder_val = f.get("placeholder") or ""
-                            norm_q = normalize_claim(label_val or placeholder_val or key)
+                            norm_q = normalize_claim(label_val or placeholder_val or f.get("name") or f.get("id") or "")
                             if norm_q:
                                 from asgiref.sync import sync_to_async
                                 @sync_to_async
@@ -468,7 +479,7 @@ IMPORTANT: Return ONLY raw JSON, no markdown formatting (no ```json)."""
                                             "is_verified": False
                                         }
                                     )
-                                await save_item(profile_db, norm_q, label_val or placeholder_val or key, drafted_val)
+                                await save_item(profile_db, norm_q, label_val or placeholder_val or f.get("name") or f.get("id") or f_key, drafted_val)
                         except Exception as save_exc:
                             print(f"     Failed to save drafted Q&A to database: {save_exc}")
             
@@ -478,7 +489,7 @@ IMPORTANT: Return ONLY raw JSON, no markdown formatting (no ```json)."""
             
     # For any fields still unmapped, fallback to basic heuristics
     for f in fields:
-        key = f.get("name") or f.get("id")
+        key = f.get("name") or f.get("id") or f.get("jobscout_id")
         if not key or key in mapping:
             continue
         
@@ -493,10 +504,7 @@ IMPORTANT: Return ONLY raw JSON, no markdown formatting (no ```json)."""
 
 async def fill_field(page: Page, field: Dict[str, Any], value: str):
     """Enters value into a single form input using human-like keyboard delays."""
-    selector = f"#{field['id']}" if field.get("id") else f"[name='{field['name']}']" if field.get("name") else ""
-    if not selector:
-        return
-
+    selector = f"[data-jobscout-id='{field['jobscout_id']}']"
     try:
         el = page.locator(selector).first
         if await el.count() == 0 or not await el.is_visible():
@@ -581,19 +589,45 @@ async def try_auto_apply(
             
             apply_xpath = await find_element_fuzzy(page, apply_selectors, apply_keywords)
             if apply_xpath:
-                await human_click(page, apply_xpath)
+                # Capture popup if clicking opens a new tab/window
+                try:
+                    async with page.context.expect_event("popup", timeout=6000) as popup_info:
+                        await human_click(page, apply_xpath)
+                    page = await popup_info.value
+                    print("  [AutoApply] Switched page reference to new popup window.")
+                except Exception:
+                    # No popup/new tab; opened in same page, carry on
+                    pass
                 await page_load_settle(page)
 
             # 6. Check for Resume Upload Inputs
             file_inputs = page.locator("input[type='file']")
-            if await file_inputs.count() > 0:
+            file_inputs_count = await file_inputs.count()
+            best_file_input = None
+            if file_inputs_count == 1:
+                best_file_input = file_inputs.first
+            elif file_inputs_count > 1:
+                # Find the one with resume-like keywords in attributes
+                for idx in range(file_inputs_count):
+                    input_loc = file_inputs.nth(idx)
+                    input_id = await input_loc.get_attribute("id") or ""
+                    input_name = await input_loc.get_attribute("name") or ""
+                    input_class = await input_loc.get_attribute("class") or ""
+                    combined = f"{input_id} {input_name} {input_class}".lower()
+                    if any(kw in combined for kw in ["resume", "cv", "pdf", "doc", "apply"]):
+                        best_file_input = input_loc
+                        break
+                else:
+                    best_file_input = file_inputs.first
+
+            if best_file_input:
                 try:
                     # Resolve absolute path to PDF
                     absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, pdf_path)
                     if os.path.exists(absolute_pdf_path):
-                        await file_inputs.first.set_input_files(absolute_pdf_path)
+                        await best_file_input.set_input_files(absolute_pdf_path)
                         await asyncio.sleep(random.uniform(1.0, 2.0))
-                        print("  [AutoApply]  Tailored resume PDF uploaded successfully.")
+                        print("  [AutoApply] Tailored resume PDF uploaded successfully.")
                 except Exception as ex:
                     print(f"   Resume upload failed: {ex}")
 
@@ -604,7 +638,7 @@ async def try_auto_apply(
                 mapping = await smart_fill_form(fields, profile_data)
                 
                 for field in fields:
-                    key = field["name"] or field["id"]
+                    key = field["jobscout_id"]
                     if key in mapping and mapping[key] is not None:
                         await fill_field(page, field, str(mapping[key]))
                 

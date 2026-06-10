@@ -56,4 +56,41 @@
         </div>
     </div>
 </section>
+
+<section class="panel" style="margin-top: 30px;">
+    <div class="panel-header">
+        <div>
+            <h2>Browser Sessions & Cookie Integration</h2>
+            <p>Load active logged-in browser cookies to bypass login walls and multi-factor authentication (MFA) checks during automated job applications.</p>
+        </div>
+    </div>
+
+    <div class="status-grid" style="grid-template-columns: 1fr;">
+        <div class="status-card" style="max-width: 100%;">
+            <span class="eyebrow" style="color: var(--primary);">Setup Instructions</span>
+            <ol style="margin-top: 10px; padding-left: 20px; line-height: 1.6;">
+                <li>Login to your target job portals (e.g., <strong>LinkedIn</strong>, <strong>Naukri</strong>, <strong>Internshala</strong>) on your primary Chrome/Firefox browser.</li>
+                <li>Use a free browser extension like <em>EditThisCookie</em> or open the developer console (<code>F12</code>) on the portal tab and run this copy-paste script:
+                    <pre style="background: #f1f5f9; padding: 10px; border-radius: 6px; overflow-x: auto; margin-top: 8px; font-size: 0.8rem; border: 1px solid #cbd5e1; white-space: pre-wrap; font-family: monospace;">copy(JSON.stringify(document.cookie.split("; ").map(c => {
+    const [name, ...val] = c.split("=");
+    return {
+        name: name,
+        value: val.join("="),
+        domain: window.location.hostname.startsWith(".") ? window.location.hostname : "." + window.location.hostname,
+        path: "/"
+    };
+})));</pre>
+                </li>
+                <li>Save the copied JSON into a file named after the portal (e.g. <code>linkedin.json</code>, <code>naukri.json</code>, or <code>internshala.json</code>).</li>
+                <li>Place the file in your project directory at: <br><code style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; font-family: monospace;">media/browser_sessions/cookies/{portal_name}.json</code></li>
+            </ol>
+            <div style="margin-top: 15px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; color: #1e3a8a; font-size: 0.85rem; display: flex; align-items: start; gap: 10px;">
+                <span style="font-weight: 700; font-size: 1rem; line-height: 1;">💡</span>
+                <div>
+                    <strong>Pro-Tip:</strong> Playwright will automatically load these cookies when initiating stealth runs, allowing the agent to fill forms as if you are browsing directly.
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}
